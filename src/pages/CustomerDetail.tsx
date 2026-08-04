@@ -59,10 +59,20 @@ export default function CustomerDetail() {
     setEditForm({ amount: p.amount, date: p.date.slice(0, 10), notes: p.notes || '', reason: '', type: p.type })
   }
 
+  const handleEditTypeChange = (type: PaymentType) => {
+    setEditForm((f) => {
+      if (type === 'NotPaid') return { ...f, type, amount: 0 }
+      if ((type === 'Paid' || type === 'Advance') && !f.amount && customer) {
+        return { ...f, type, amount: customer.installmentAmount || 0 }
+      }
+      return { ...f, type }
+    })
+  }
+
   const submitEdit = async () => {
     if (!editPayment) return
     await api.put(`/payments/${editPayment.id}`, {
-      amount: editForm.amount,
+      amount: editForm.type === 'NotPaid' ? 0 : editForm.amount,
       date: editForm.date,
       notes: editForm.notes,
       type: editForm.type,
@@ -88,7 +98,23 @@ export default function CustomerDetail() {
       return
     }
     setAddSlot(t)
-    setAddForm({ amount: t.status === 'Due' && customer.installmentAmount ? customer.installmentAmount : 0, type: 'Paid', notes: '' })
+    // Default to the loan's daily installment amount for Paid (the common case) instead of 0,
+    // regardless of whether this slot was Missed, Due, or Pending — the collector can still
+    // adjust it down for a Partial payment.
+    setAddForm({ amount: customer.installmentAmount || 0, type: 'Paid', notes: '' })
+  }
+
+  // Keep the amount sensible as the type changes: Paid/Advance default back to the full daily
+  // installment if the field is empty, and Not Paid always collects Rs. 0 (its amount input is
+  // hidden entirely so nothing can be typed into it).
+  const handleAddTypeChange = (type: PaymentType) => {
+    setAddForm((f) => {
+      if (type === 'NotPaid') return { ...f, type, amount: 0 }
+      if ((type === 'Paid' || type === 'Advance') && !f.amount) {
+        return { ...f, type, amount: customer.installmentAmount || 0 }
+      }
+      return { ...f, type }
+    })
   }
 
   const submitAddSlot = async () => {
@@ -355,20 +381,24 @@ export default function CustomerDetail() {
         >
           <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
-              <input type="number" className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
-                value={editForm.amount} onChange={(e) => setEditForm((f) => ({ ...f, amount: Number(e.target.value) }))} />
-            </div>
-            <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
               <select className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
-                value={editForm.type} onChange={(e) => setEditForm((f) => ({ ...f, type: e.target.value as PaymentType }))}>
+                value={editForm.type} onChange={(e) => handleEditTypeChange(e.target.value as PaymentType)}>
                 <option value="Paid">Paid</option>
                 <option value="Partial">Partial</option>
                 <option value="NotPaid">Not Paid</option>
                 <option value="Advance">Advance</option>
               </select>
             </div>
+            {editForm.type === 'NotPaid' ? (
+              <p className="text-xs text-gray-400 dark:text-gray-500">Not Paid always records Rs. 0 &mdash; no amount needed.</p>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
+                <input type="number" className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
+                  value={editForm.amount} onChange={(e) => setEditForm((f) => ({ ...f, amount: Number(e.target.value) }))} />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
               <input type="date" className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
@@ -409,16 +439,20 @@ export default function CustomerDetail() {
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
             <select className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
-              value={addForm.type} onChange={(e) => setAddForm((f) => ({ ...f, type: e.target.value as PaymentType }))}>
+              value={addForm.type} onChange={(e) => handleAddTypeChange(e.target.value as PaymentType)}>
               <option value="Paid">Paid</option>
               <option value="Partial">Partial</option>
               <option value="NotPaid">Not Paid</option>
               <option value="Advance">Advance</option>
             </select>
           </div>
-          {addForm.type !== 'NotPaid' && (
+          {addForm.type === 'NotPaid' ? (
+            <p className="text-xs text-gray-400 dark:text-gray-500">Not Paid always records Rs. 0 for this day &mdash; no amount needed.</p>
+          ) : (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Amount {addForm.type === 'Paid' && customer.installmentAmount ? `(defaults to the daily installment, ${formatCurrency(customer.installmentAmount)})` : ''}
+              </label>
               <input type="number" min={1} autoFocus
                 className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
                 value={addForm.amount} onChange={(e) => setAddForm((f) => ({ ...f, amount: Number(e.target.value) }))} />
