@@ -63,9 +63,7 @@ export default function Login() {
             <LogIn size={16} /> {loading ? 'Signing in...' : 'Sign In'}
           </Button>
         </form>
-        <div className="mt-6 text-xs text-gray-400 dark:text-gray-500 text-center">
-          Demo: admin / admin123 (Admin) &middot; staff / staff123 (Staff)
-        </div>
+        
       </div>
     </div>
   )
