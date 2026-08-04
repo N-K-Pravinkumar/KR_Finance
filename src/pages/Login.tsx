@@ -36,7 +36,6 @@ export default function Login() {
             <Wallet size={28} />
           </div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">KR Finance</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Collection Management System</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -62,8 +61,7 @@ export default function Login() {
           <Button type="submit" className="w-full" disabled={loading}>
             <LogIn size={16} /> {loading ? 'Signing in...' : 'Sign In'}
           </Button>
-        </form>
-        
+        </form> 
       </div>
     </div>
   )
