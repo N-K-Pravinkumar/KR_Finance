@@ -109,7 +109,7 @@ export default function QuickCollection() {
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Quick Collection</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Customers due today (visible after 12:00 PM) &mdash; fast entry to mark today&apos;s collections. Customers with multiple loans show all their due loans together.
+          Customers due today (refreshes at 12:00 AM IST) &mdash; fast entry to mark today&apos;s collections. Customers with multiple loans show all their due loans together.
         </p>
       </div>
 
@@ -143,14 +143,26 @@ export default function QuickCollection() {
               </div>
 
               <div className="space-y-3">
-                {loans.map((c) => (
-                  <div key={c.id} className={loans.length > 1 ? 'border border-gray-100 dark:border-gray-700 rounded-lg p-2.5' : ''}>
+                {loans.map((c) => {
+                  const isPartial = c.lastPaymentType === 'Partial'
+                  return (
+                  <div
+                    key={c.id}
+                    className={
+                      (loans.length > 1 ? 'rounded-lg p-2.5 border ' : 'rounded-lg p-1 border-l-4 ') +
+                      (isPartial
+                        ? 'border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20'
+                        : (loans.length > 1 ? 'border-gray-100 dark:border-gray-700' : 'border-transparent'))
+                    }
+                  >
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
                         Loan #{c.id} &middot; {formatCurrency(c.financeAmount)}
                       </span>
                       {isOverdue(c.nextDueDate, c.status) ? (
                         <Badge color="red">Overdue</Badge>
+                      ) : isPartial ? (
+                        <Badge color="yellow">Partial Pending</Badge>
                       ) : (
                         <Badge color="blue">{c.financeType}</Badge>
                       )}
@@ -174,7 +186,8 @@ export default function QuickCollection() {
                       </Button>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </Card>
           )
