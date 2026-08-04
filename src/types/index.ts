@@ -26,6 +26,7 @@ export interface Customer {
   endDate?: string
   lastPaymentDate?: string
   lastPaymentAmount?: number
+  lastPaymentType?: PaymentType
   status: CustomerStatus
   createdAt: string
 }
