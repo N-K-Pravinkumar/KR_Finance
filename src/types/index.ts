@@ -8,6 +8,7 @@ export interface Customer {
   name: string
   mobile: string
   alternateMobile?: string
+  groupKey?: string
   address: string
   financeAmount: number
   interest: number

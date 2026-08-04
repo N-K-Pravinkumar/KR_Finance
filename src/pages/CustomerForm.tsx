@@ -7,7 +7,7 @@ import { Button } from '../components/ui/Button'
 import { useAuth } from '../context/AuthContext'
 
 const emptyForm = {
-  name: '', mobile: '', alternateMobile: '', address: '',
+  name: '', mobile: '', alternateMobile: '', groupKey: '', address: '',
   financeAmount: 0, interest: 10, startDate: new Date().toISOString().slice(0, 10),
   financeType: 'Daily' as 'Daily' | 'Weekly', collectionDay: '', totalInstallments: 100
 }
@@ -25,7 +25,7 @@ export default function CustomerForm() {
       api.get<Customer>(`/customers/${id}`).then((r) => {
         const c = r.data
         setForm({
-          name: c.name, mobile: c.mobile, alternateMobile: c.alternateMobile || '',
+          name: c.name, mobile: c.mobile, alternateMobile: c.alternateMobile || '', groupKey: c.groupKey || '',
           address: c.address, financeAmount: c.financeAmount, interest: c.interest,
           startDate: c.startDate?.slice(0, 10), financeType: c.financeType,
           collectionDay: c.collectionDay || '', totalInstallments: c.totalInstallments
@@ -67,6 +67,16 @@ export default function CustomerForm() {
               <Field label="Mobile Number" value={form.mobile} onChange={(v) => handleChange('mobile', v)} required />
               <Field label="Alternate Mobile" value={form.alternateMobile} onChange={(v) => handleChange('alternateMobile', v)} />
               <Field label="Start Date" type="date" value={form.startDate} onChange={(v) => handleChange('startDate', v)} required />
+              <div className="sm:col-span-2">
+                <Field
+                  label="Person / Group Key (optional — link multiple loans to the same person)"
+                  value={form.groupKey}
+                  onChange={(v) => handleChange('groupKey', v)}
+                />
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  Leave blank to auto-group by name. If this person already has another loan, use the exact same value here as on their other loan (e.g. their name or a shared ID) so both show up under "Other Loans".
+                </p>
+              </div>
             </div>
             <Field label="Address" value={form.address} onChange={(v) => handleChange('address', v)} textarea />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -18,6 +18,7 @@ export default function CustomerDetail() {
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [payments, setPayments] = useState<Payment[]>([])
   const [history, setHistory] = useState<AuditEntry[]>([])
+  const [otherLoans, setOtherLoans] = useState<Customer[]>([])
   const [pendingAction, setPendingAction] = useState<'Paid' | 'NotPaid' | null>(null)
   const [editPayment, setEditPayment] = useState<Payment | null>(null)
   const [editForm, setEditForm] = useState({ amount: 0, date: '', notes: '', reason: '', type: 'Paid' as PaymentType })
@@ -27,6 +28,7 @@ export default function CustomerDetail() {
     api.get<Customer>(`/customers/${id}`).then((r) => setCustomer(r.data))
     api.get<Payment[]>(`/payments/customer/${id}`).then((r) => setPayments(r.data))
     api.get<AuditEntry[]>(`/audit-logs/customer/${id}`).then((r) => setHistory(r.data)).catch(() => setHistory([]))
+    api.get<Customer[]>(`/customers/${id}/other-loans`).then((r) => setOtherLoans(r.data)).catch(() => setOtherLoans([]))
   }
 
   useEffect(() => { load() }, [id])
@@ -114,6 +116,27 @@ export default function CustomerDetail() {
           )}
         </div>
       </div>
+
+      {otherLoans.length > 0 && (
+        <Card className="p-4">
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2 text-sm">
+            Other Loans for {customer.name} ({otherLoans.length})
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {otherLoans.map((o) => (
+              <Link
+                key={o.id}
+                to={`/customers/${o.id}`}
+                className="flex items-center gap-2 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                <span className="font-medium text-gray-900 dark:text-gray-100">{formatCurrency(o.financeAmount)}</span>
+                <Badge color={o.status === 'Running' ? 'blue' : o.status === 'Completed' ? 'green' : 'gray'}>{o.status}</Badge>
+                <span className="text-gray-400 dark:text-gray-500">Pending {formatCurrency(o.pendingAmount)}</span>
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Stat label="Total Pending" value={formatCurrency(customer.pendingAmount)} />
