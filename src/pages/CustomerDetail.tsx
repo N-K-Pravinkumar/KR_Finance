@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { MessageCircle, MessageSquare, Pencil, CheckCircle2, XCircle, ArrowLeft, Trash2 } from 'lucide-react'
 import { api } from '../api/client'
-import { Customer, Payment, PaymentType, AuditEntry } from '../types'
+import { Customer, Payment, PaymentType, AuditEntry, TimelineEntry } from '../types'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
@@ -17,16 +17,21 @@ export default function CustomerDetail() {
 
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [payments, setPayments] = useState<Payment[]>([])
+  const [timeline, setTimeline] = useState<TimelineEntry[]>([])
   const [history, setHistory] = useState<AuditEntry[]>([])
   const [otherLoans, setOtherLoans] = useState<Customer[]>([])
   const [pendingAction, setPendingAction] = useState<'Paid' | 'NotPaid' | null>(null)
   const [editPayment, setEditPayment] = useState<Payment | null>(null)
   const [editForm, setEditForm] = useState({ amount: 0, date: '', notes: '', reason: '', type: 'Paid' as PaymentType })
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [addSlot, setAddSlot] = useState<TimelineEntry | null>(null)
+  const [addForm, setAddForm] = useState({ amount: 0, type: 'Paid' as PaymentType, notes: '' })
+  const [addSubmitting, setAddSubmitting] = useState(false)
 
   const load = () => {
     api.get<Customer>(`/customers/${id}`).then((r) => setCustomer(r.data))
     api.get<Payment[]>(`/payments/customer/${id}`).then((r) => setPayments(r.data))
+    api.get<TimelineEntry[]>(`/payments/customer/${id}/timeline`).then((r) => setTimeline(r.data)).catch(() => setTimeline([]))
     api.get<AuditEntry[]>(`/audit-logs/customer/${id}`).then((r) => setHistory(r.data)).catch(() => setHistory([]))
     api.get<Customer[]>(`/customers/${id}/other-loans`).then((r) => setOtherLoans(r.data)).catch(() => setOtherLoans([]))
   }
@@ -71,6 +76,38 @@ export default function CustomerDetail() {
   const handleDelete = async () => {
     await api.delete(`/customers/${customer.id}`)
     navigate('/customers')
+  }
+
+  // Clicking a slot on the full schedule: if it already has a recorded payment, open the
+  // (admin-only) edit dialog for that payment; otherwise open a quick "add payment for this
+  // day" dialog so a missed/pending/due day can be filled in directly from the timeline.
+  const openTimelineSlot = (t: TimelineEntry) => {
+    if (t.paymentId) {
+      const existing = payments.find((p) => p.id === t.paymentId)
+      if (existing && isAdmin) openEdit(existing)
+      return
+    }
+    setAddSlot(t)
+    setAddForm({ amount: t.status === 'Due' && customer.installmentAmount ? customer.installmentAmount : 0, type: 'Paid', notes: '' })
+  }
+
+  const submitAddSlot = async () => {
+    if (!addSlot) return
+    setAddSubmitting(true)
+    try {
+      await api.post('/payments', {
+        customerId: customer.id,
+        date: addSlot.date,
+        amount: addForm.type === 'NotPaid' ? 0 : addForm.amount,
+        type: addForm.type,
+        collectedBy: user?.name || 'Staff',
+        notes: addForm.notes || `Added from timeline (Day ${addSlot.installmentNo})`
+      })
+      setAddSlot(null)
+      load()
+    } finally {
+      setAddSubmitting(false)
+    }
   }
 
   const waMessage = buildWhatsAppMessage({
@@ -210,6 +247,53 @@ export default function CustomerDetail() {
         </Card>
 
         <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle>Full {customer.totalInstallments}-{customer.financeType === 'Weekly' ? 'Week' : 'Day'} Schedule</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {timeline.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500">No schedule available.</p>}
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
+              Click any day to {isAdmin ? 'add or edit' : 'add'} its payment.
+            </p>
+            <div className="flex flex-wrap gap-1.5 max-h-[320px] overflow-y-auto pr-1">
+              {timeline.map((t) => {
+                const clickable = !t.paymentId || isAdmin
+                return (
+                  <button
+                    type="button"
+                    key={t.installmentNo}
+                    onClick={() => openTimelineSlot(t)}
+                    disabled={!clickable}
+                    title={`Day ${t.installmentNo} · ${formatDate(t.date)} · ${t.status}${t.amount ? ' · ' + formatCurrency(t.amount) : ''}${clickable ? ' · click to ' + (t.paymentId ? 'edit' : 'add') : ''}`}
+                    className={
+                      'w-14 sm:w-16 rounded-md px-1.5 py-1.5 text-center border transition ' +
+                      timelineColor(t.status) +
+                      (t.today ? ' ring-2 ring-blue-500' : '') +
+                      (clickable ? ' hover:brightness-95 cursor-pointer' : ' cursor-default opacity-90')
+                    }
+                  >
+                    <p className="text-[10px] font-semibold leading-tight">#{t.installmentNo}</p>
+                    <p className="text-[9px] leading-tight opacity-80">{formatDate(t.date).replace(/, \d{4}$/, '')}</p>
+                    <p className="text-[10px] font-medium leading-tight mt-0.5">{t.status}</p>
+                    {t.amount != null && t.status !== 'Missed' && (
+                      <p className="text-[9px] leading-tight opacity-80">{formatCurrency(t.amount)}</p>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex flex-wrap gap-3 mt-3 text-[11px] text-gray-500 dark:text-gray-400">
+              <LegendDot color="bg-green-100 border-green-300 text-green-700" label="Paid" />
+              <LegendDot color="bg-yellow-100 border-yellow-300 text-yellow-700" label="Partial" />
+              <LegendDot color="bg-purple-100 border-purple-300 text-purple-700" label="Advance" />
+              <LegendDot color="bg-red-100 border-red-300 text-red-700" label="Not Paid / Missed" />
+              <LegendDot color="bg-blue-100 border-blue-300 text-blue-700" label="Due Today" />
+              <LegendDot color="bg-gray-100 border-gray-300 text-gray-500" label="Pending (future)" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-3">
           <CardHeader><CardTitle>Edit History</CardTitle></CardHeader>
           <CardContent className="space-y-2 max-h-[400px] overflow-y-auto">
             {history.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500">No edits recorded yet — profile and payment edits will appear here.</p>}
@@ -304,6 +388,49 @@ export default function CustomerDetail() {
           </div>
         </Dialog>
       )}
+
+      <Dialog
+        open={!!addSlot}
+        onClose={() => setAddSlot(null)}
+        title={addSlot ? `Add Payment — Day ${addSlot.installmentNo} (${formatDate(addSlot.date)})` : 'Add Payment'}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setAddSlot(null)}>Cancel</Button>
+            <Button
+              onClick={submitAddSlot}
+              disabled={addSubmitting || (addForm.type !== 'NotPaid' && !(addForm.amount > 0))}
+            >
+              {addSubmitting ? 'Saving...' : 'Save'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+            <select className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
+              value={addForm.type} onChange={(e) => setAddForm((f) => ({ ...f, type: e.target.value as PaymentType }))}>
+              <option value="Paid">Paid</option>
+              <option value="Partial">Partial</option>
+              <option value="NotPaid">Not Paid</option>
+              <option value="Advance">Advance</option>
+            </select>
+          </div>
+          {addForm.type !== 'NotPaid' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
+              <input type="number" min={1} autoFocus
+                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
+                value={addForm.amount} onChange={(e) => setAddForm((f) => ({ ...f, amount: Number(e.target.value) }))} />
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes (optional)</label>
+            <input className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
+              value={addForm.notes} onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))} />
+          </div>
+        </div>
+      </Dialog>
     </div>
   )
 }
@@ -323,5 +450,26 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="text-gray-500 dark:text-gray-400">{label}</span>
       <span className="font-medium text-gray-900 dark:text-gray-100">{value}</span>
     </div>
+  )
+}
+
+function timelineColor(status: string): string {
+  switch (status) {
+    case 'Paid': return 'bg-green-100 border-green-300 text-green-700'
+    case 'Partial': return 'bg-yellow-100 border-yellow-300 text-yellow-700'
+    case 'Advance': return 'bg-purple-100 border-purple-300 text-purple-700'
+    case 'NotPaid':
+    case 'Missed': return 'bg-red-100 border-red-300 text-red-700'
+    case 'Due': return 'bg-blue-100 border-blue-300 text-blue-700'
+    default: return 'bg-gray-100 border-gray-300 text-gray-500'
+  }
+}
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1">
+      <span className={`w-3 h-3 rounded-sm border inline-block ${color}`} />
+      {label}
+    </span>
   )
 }

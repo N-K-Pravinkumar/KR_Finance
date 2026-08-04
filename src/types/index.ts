@@ -45,6 +45,15 @@ export interface Payment {
   createdAt: string
 }
 
+export interface TimelineEntry {
+  installmentNo: number
+  date: string
+  status: 'Paid' | 'Partial' | 'NotPaid' | 'Advance' | 'Pending' | 'Due' | 'Missed'
+  amount?: number
+  paymentId?: number
+  today: boolean
+}
+
 export interface AuditEntry {
   id: number
   entity: string

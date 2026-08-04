@@ -35,7 +35,7 @@ export default function Login() {
           <div className="bg-blue-600 text-white rounded-xl p-3 mb-3">
             <Wallet size={28} />
           </div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">KN Finance</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">KR Finance</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">Collection Management System</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">

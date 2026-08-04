@@ -38,6 +38,20 @@ export default function QuickCollection() {
     )
   }, [customers, search])
 
+  // Group loans due today by the person they belong to (groupKey), so someone with multiple
+  // running loans shows as one card with every one of their due loans listed together instead
+  // of scattered separately across the grid.
+  const grouped = useMemo(() => {
+    const map = new Map<string, Customer[]>()
+    for (const c of filtered) {
+      const key = c.groupKey || `id-${c.id}`
+      const arr = map.get(key) || []
+      arr.push(c)
+      map.set(key, arr)
+    }
+    return Array.from(map.values()).sort((a, b) => a[0].name.localeCompare(b[0].name))
+  }, [filtered])
+
   const submitPayment = async (customerId: number, type: 'Paid' | 'Partial' | 'NotPaid' | 'Advance', amount: number, note: string) => {
     await api.post('/payments', {
       customerId,
@@ -94,7 +108,9 @@ export default function QuickCollection() {
     <div className="space-y-4 py-2">
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Quick Collection</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">Customers due today &mdash; fast entry to mark today&apos;s collections</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Customers due today (visible after 12:00 PM) &mdash; fast entry to mark today&apos;s collections. Customers with multiple loans show all their due loans together.
+        </p>
       </div>
 
       {successMsg && (
@@ -114,41 +130,59 @@ export default function QuickCollection() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {filtered.map((c) => (
-          <Card key={c.id} className="p-4">
-            <div className="flex items-start justify-between mb-2">
-              <div>
-                <p className="font-semibold text-gray-900 dark:text-gray-100">{c.name}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{c.mobile}</p>
+        {grouped.map((loans) => {
+          const first = loans[0]
+          return (
+            <Card key={first.groupKey || first.id} className="p-4">
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-gray-100">{first.name}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{first.mobile}</p>
+                </div>
+                {loans.length > 1 && <Badge color="purple">{loans.length} loans due</Badge>}
               </div>
-              {isOverdue(c.nextDueDate, c.status) ? (
-                <Badge color="red">Overdue</Badge>
-              ) : (
-                <Badge color="blue">{c.financeType}</Badge>
-              )}
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-3 space-y-0.5">
-              <p>Installment: <span className="font-medium text-gray-800 dark:text-gray-200">{formatCurrency(c.installmentAmount)}</span></p>
-              <p>Due: <span className="font-medium text-gray-800 dark:text-gray-200">{dueLabel(c.nextDueDate, c.financeType)}</span></p>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Button size="sm" variant="success" onClick={() => setPending({ customer: c, type: 'Paid' })}>
-                <CheckCircle2 size={14} /> Paid Today
-              </Button>
-              <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white" onClick={() => { setAmountAction({ customer: c, type: 'Partial' }); setAmountValue('') }}>
-                <Clock3 size={14} /> Partial
-              </Button>
-              <Button size="sm" variant="danger" onClick={() => setPending({ customer: c, type: 'NotPaid' })}>
-                <XCircle size={14} /> Not Paid
-              </Button>
-              <Button size="sm" className="bg-blue-500 hover:bg-blue-600 text-white" onClick={() => { setAmountAction({ customer: c, type: 'Advance' }); setAmountValue('') }}>
-                <TrendingUp size={14} /> Advance
-              </Button>
-            </div>
-          </Card>
-        ))}
-        {filtered.length === 0 && (
-          <p className="text-sm text-gray-400 dark:text-gray-500 col-span-full text-center py-10">No customers due today.</p>
+
+              <div className="space-y-3">
+                {loans.map((c) => (
+                  <div key={c.id} className={loans.length > 1 ? 'border border-gray-100 dark:border-gray-700 rounded-lg p-2.5' : ''}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
+                        Loan #{c.id} &middot; {formatCurrency(c.financeAmount)}
+                      </span>
+                      {isOverdue(c.nextDueDate, c.status) ? (
+                        <Badge color="red">Overdue</Badge>
+                      ) : (
+                        <Badge color="blue">{c.financeType}</Badge>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 space-y-0.5">
+                      <p>Today&apos;s installment: <span className="font-medium text-gray-800 dark:text-gray-200">{formatCurrency(c.installmentAmount)}</span></p>
+                      <p>Due: <span className="font-medium text-gray-800 dark:text-gray-200">{dueLabel(c.nextDueDate, c.financeType)}</span></p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button size="sm" variant="success" onClick={() => setPending({ customer: c, type: 'Paid' })}>
+                        <CheckCircle2 size={14} /> Paid Today
+                      </Button>
+                      <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white" onClick={() => { setAmountAction({ customer: c, type: 'Partial' }); setAmountValue('') }}>
+                        <Clock3 size={14} /> Partial
+                      </Button>
+                      <Button size="sm" variant="danger" onClick={() => setPending({ customer: c, type: 'NotPaid' })}>
+                        <XCircle size={14} /> Not Paid
+                      </Button>
+                      <Button size="sm" className="bg-blue-500 hover:bg-blue-600 text-white" onClick={() => { setAmountAction({ customer: c, type: 'Advance' }); setAmountValue('') }}>
+                        <TrendingUp size={14} /> Advance
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )
+        })}
+        {grouped.length === 0 && (
+          <p className="text-sm text-gray-400 dark:text-gray-500 col-span-full text-center py-10">
+            No collections due right now. Today&apos;s installments appear here after 12:00 PM.
+          </p>
         )}
       </div>
 

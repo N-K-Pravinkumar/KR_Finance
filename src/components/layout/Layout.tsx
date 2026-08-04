@@ -43,7 +43,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <aside className="hidden lg:flex lg:flex-col w-64 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0">
         <div className="h-16 flex items-center gap-2 px-5 border-b border-gray-100 dark:border-gray-700">
           <Wallet className="text-blue-600" size={22} />
-          <span className="font-bold text-gray-900 dark:text-gray-100 flex-1">KN Finance</span>
+          <span className="font-bold text-gray-900 dark:text-gray-100 flex-1">KR Finance</span>
           <ThemeToggleButton />
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
@@ -82,7 +82,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4">
         <div className="flex items-center gap-2">
           <Wallet className="text-blue-600" size={20} />
-          <span className="font-bold text-gray-900 dark:text-gray-100">KN Finance</span>
+          <span className="font-bold text-gray-900 dark:text-gray-100">KR Finance</span>
         </div>
         <div className="flex items-center gap-1">
           <ThemeToggleButton />
