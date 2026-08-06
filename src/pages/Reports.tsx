@@ -1,11 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { MessageCircle, MessageSquare, Download, FileText, FileSpreadsheet, Search } from 'lucide-react'
 import { api } from '../api/client'
-import { Customer, Payment, OrgSummary } from '../types'
+import { Customer, Payment, OrgSummary, DailyReport } from '../types'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { formatCurrency, formatDate, dueLabel, buildWhatsAppMessage, buildWhatsAppLink } from '../utils/format'
+
+function statusBadgeColor(status: string): 'green' | 'red' | 'yellow' | 'purple' | 'blue' | 'gray' {
+  if (status === 'Paid') return 'green'
+  if (status === 'NotPaid') return 'red'
+  if (status === 'Partial') return 'yellow'
+  if (status === 'Advance') return 'purple'
+  if (status === 'Pending') return 'blue'
+  return 'gray' // Not Due Yet
+}
 
 async function downloadBlob(url: string, params: Record<string, any>, filename: string, mime: string) {
   const res = await api.get(url, { params, responseType: 'blob' })
@@ -25,6 +34,10 @@ export default function Reports() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [summary, setSummary] = useState<OrgSummary | null>(null)
   const [search, setSearch] = useState('')
+  const [activeTab, setActiveTab] = useState<'downloadable' | 'daily'>('downloadable')
+  const [dailyReport, setDailyReport] = useState<DailyReport | null>(null)
+  const [dailyReportDate, setDailyReportDate] = useState(new Date().toISOString().slice(0, 10))
+  const [dailySearch, setDailySearch] = useState('')
 
   // Customer / payment pickers for statement, receipt
   const [pickerQuery, setPickerQuery] = useState('')
@@ -46,6 +59,17 @@ export default function Reports() {
     api.get('/customers').then((r) => setCustomers(r.data))
     api.get('/reports/summary').then((r) => setSummary(r.data)).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (activeTab !== 'daily') return
+    api.get<DailyReport>('/reports/daily', { params: { date: dailyReportDate } }).then((r) => setDailyReport(r.data))
+  }, [activeTab, dailyReportDate])
+
+  const dailyRows = useMemo(() => {
+    if (!dailyReport) return []
+    const q = dailySearch.toLowerCase()
+    return dailyReport.rows.filter((r) => !q || r.name.toLowerCase().includes(q) || r.mobile.includes(q))
+  }, [dailyReport, dailySearch])
 
   useEffect(() => {
     if (!receiptCustomerId) { setReceiptPayments([]); return }
@@ -138,6 +162,110 @@ export default function Reports() {
         </div>
       )}
 
+      {summary && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Card className="p-4"><p className="text-xs text-gray-500 dark:text-gray-400">Today&apos;s Total Collection (Due)</p><p className="text-lg font-bold text-gray-900 dark:text-gray-100">{formatCurrency(summary.todayToCollect)}</p></Card>
+          <Card className="p-4"><p className="text-xs text-gray-500 dark:text-gray-400">Today&apos;s Collected Amount</p><p className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(summary.todayCollected)}</p></Card>
+          <Card className="p-4"><p className="text-xs text-gray-500 dark:text-gray-400">Today&apos;s Pending Amount</p><p className="text-lg font-bold text-amber-600 dark:text-amber-400">{formatCurrency(summary.todayNotCollected)}</p></Card>
+        </div>
+      )}
+
+      <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'downloadable' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400'}`}
+          onClick={() => setActiveTab('downloadable')}
+        >
+          Downloadable Reports
+        </button>
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${activeTab === 'daily' ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400'}`}
+          onClick={() => setActiveTab('daily')}
+        >
+          Daily Report
+        </button>
+      </div>
+
+      {activeTab === 'daily' && (
+        <Card>
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <CardTitle>Daily Report</CardTitle>
+            <div className="flex items-center gap-2">
+              <input type="date" className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
+                value={dailyReportDate} onChange={(e) => setDailyReportDate(e.target.value)} />
+              <Button variant="secondary" size="sm" onClick={() => downloadBlob('/reports/pdf/daily-collection', { date: dailyReportDate }, `daily-collection-${dailyReportDate}.pdf`, PDF_MIME)}>
+                <FileText size={14} /> Download PDF
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {dailyReport && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <div className="border border-gray-100 dark:border-gray-700 rounded-lg p-2.5">
+                  <p className="text-gray-400 dark:text-gray-500">To Collect</p>
+                  <p className="font-bold text-gray-900 dark:text-gray-100">{formatCurrency(dailyReport.totalToCollect)}</p>
+                </div>
+                <div className="border border-gray-100 dark:border-gray-700 rounded-lg p-2.5">
+                  <p className="text-gray-400 dark:text-gray-500">Collected</p>
+                  <p className="font-bold text-green-600 dark:text-green-400">{formatCurrency(dailyReport.totalCollected)}</p>
+                </div>
+                <div className="border border-gray-100 dark:border-gray-700 rounded-lg p-2.5">
+                  <p className="text-gray-400 dark:text-gray-500">Not Collected</p>
+                  <p className="font-bold text-red-600 dark:text-red-400">{formatCurrency(dailyReport.totalNotCollected)}</p>
+                </div>
+                <div className="border border-gray-100 dark:border-gray-700 rounded-lg p-2.5">
+                  <p className="text-gray-400 dark:text-gray-500">Paid / Not Paid / Partial / Advance</p>
+                  <p className="font-bold text-gray-900 dark:text-gray-100">{dailyReport.paidCount} / {dailyReport.notPaidCount} / {dailyReport.partialCount} / {dailyReport.advanceCount}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <input
+                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg pl-9 pr-3 py-2 text-sm"
+                placeholder="Search by name or mobile..."
+                value={dailySearch}
+                onChange={(e) => setDailySearch(e.target.value)}
+              />
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 text-xs uppercase">
+                  <tr>
+                    <th className="text-left px-3 py-2">Name</th>
+                    <th className="text-right px-3 py-2">Daily Amount</th>
+                    <th className="text-right px-3 py-2">Collected Today</th>
+                    <th className="text-right px-3 py-2">Balance</th>
+                    <th className="text-left px-3 py-2">Days Paid</th>
+                    <th className="text-left px-3 py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dailyRows.map((r) => (
+                    <tr key={r.customerId} className="border-t border-gray-100 dark:border-gray-700">
+                      <td className="px-3 py-2">
+                        <p className="font-medium text-gray-900 dark:text-gray-100">{r.name}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">{r.mobile}</p>
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-900 dark:text-gray-100">{formatCurrency(r.dailyCollection)}</td>
+                      <td className="px-3 py-2 text-right text-gray-900 dark:text-gray-100">
+                        {r.todayAmount != null ? formatCurrency(r.todayAmount) : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-900 dark:text-gray-100">{formatCurrency(r.balanceAmount)}</td>
+                      <td className="px-3 py-2 text-gray-900 dark:text-gray-100">{r.daysPaid} / {r.totalInstallments}</td>
+                      <td className="px-3 py-2"><Badge color={statusBadgeColor(r.todayStatus)}>{r.todayStatus}</Badge></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {dailyRows.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">No customers found.</p>}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'downloadable' && (
       <Card>
         <CardHeader><CardTitle>Downloadable Reports</CardTitle></CardHeader>
         <CardContent className="space-y-4">
@@ -216,6 +344,7 @@ export default function Reports() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       <Card>
         <CardHeader className="flex items-center justify-between">

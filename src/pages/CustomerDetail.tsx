@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { MessageCircle, MessageSquare, Pencil, CheckCircle2, XCircle, ArrowLeft, Trash2 } from 'lucide-react'
+import { MessageCircle, MessageSquare, Pencil, ArrowLeft, Trash2, CheckSquare, Square, XCircle as XCircleIcon, X as XIcon, ShieldCheck } from 'lucide-react'
 import { api } from '../api/client'
 import { Customer, Payment, PaymentType, AuditEntry, TimelineEntry } from '../types'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
@@ -20,13 +20,20 @@ export default function CustomerDetail() {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([])
   const [history, setHistory] = useState<AuditEntry[]>([])
   const [otherLoans, setOtherLoans] = useState<Customer[]>([])
-  const [pendingAction, setPendingAction] = useState<'Paid' | 'NotPaid' | null>(null)
   const [editPayment, setEditPayment] = useState<Payment | null>(null)
   const [editForm, setEditForm] = useState({ amount: 0, date: '', notes: '', reason: '', type: 'Paid' as PaymentType })
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [closeConfirm, setCloseConfirm] = useState(false)
   const [addSlot, setAddSlot] = useState<TimelineEntry | null>(null)
   const [addForm, setAddForm] = useState({ amount: 0, type: 'Paid' as PaymentType, notes: '' })
   const [addSubmitting, setAddSubmitting] = useState(false)
+
+  // Bulk selection on the full schedule: pick several days, then mark them all Paid / Not Paid,
+  // or clear whatever marking they already had, in one action.
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [successMsg, setSuccessMsg] = useState('')
 
   const load = () => {
     api.get<Customer>(`/customers/${id}`).then((r) => setCustomer(r.data))
@@ -38,41 +45,46 @@ export default function CustomerDetail() {
 
   useEffect(() => { load() }, [id])
 
+  useEffect(() => {
+    if (!successMsg) return
+    const t = setTimeout(() => setSuccessMsg(''), 3000)
+    return () => clearTimeout(t)
+  }, [successMsg])
+
   if (!customer) return <p className="text-sm text-gray-400 dark:text-gray-500 py-10 text-center">Loading...</p>
 
-  const handleMarkPayment = async () => {
-    if (!pendingAction) return
-    await api.post('/payments', {
-      customerId: customer.id,
-      date: new Date().toISOString().slice(0, 10),
-      amount: pendingAction === 'Paid' ? customer.installmentAmount : 0,
-      type: pendingAction,
-      collectedBy: user?.name || 'Staff',
-      notes: pendingAction === 'Paid' ? 'Marked paid from detail page' : 'Marked not paid'
-    })
-    setPendingAction(null)
-    load()
-  }
+  const installment = customer.installmentAmount || 0
+  // For Advance payments, the amount field always represents "extra on top of today's
+  // installment" rather than the raw total — toTotal/toExtra convert between the two so the
+  // number stored in the DB (the real total charged that day) always includes today's amount.
+  const toTotal = (extra: number) => installment + (extra || 0)
+  const toExtra = (total: number) => Math.max(0, (total || 0) - installment)
 
   const openEdit = (p: Payment) => {
     setEditPayment(p)
-    setEditForm({ amount: p.amount, date: p.date.slice(0, 10), notes: p.notes || '', reason: '', type: p.type })
+    setEditForm({
+      amount: p.type === 'Advance' ? toExtra(p.amount) : p.amount,
+      date: p.date.slice(0, 10),
+      notes: p.notes || '',
+      reason: '',
+      type: p.type
+    })
   }
 
   const handleEditTypeChange = (type: PaymentType) => {
     setEditForm((f) => {
       if (type === 'NotPaid') return { ...f, type, amount: 0 }
-      if ((type === 'Paid' || type === 'Advance') && !f.amount && customer) {
-        return { ...f, type, amount: customer.installmentAmount || 0 }
-      }
+      if (type === 'Paid' && !f.amount) return { ...f, type, amount: installment }
+      if (type === 'Advance' && f.type !== 'Advance') return { ...f, type, amount: 0 }
       return { ...f, type }
     })
   }
 
   const submitEdit = async () => {
     if (!editPayment) return
+    const amount = editForm.type === 'NotPaid' ? 0 : editForm.type === 'Advance' ? toTotal(editForm.amount) : editForm.amount
     await api.put(`/payments/${editPayment.id}`, {
-      amount: editForm.type === 'NotPaid' ? 0 : editForm.amount,
+      amount,
       date: editForm.date,
       notes: editForm.notes,
       type: editForm.type,
@@ -88,31 +100,45 @@ export default function CustomerDetail() {
     navigate('/customers')
   }
 
-  // Clicking a slot on the full schedule: if it already has a recorded payment, open the
-  // (admin-only) edit dialog for that payment; otherwise open a quick "add payment for this
-  // day" dialog so a missed/pending/due day can be filled in directly from the timeline.
+  const submitClose = async () => {
+    try {
+      await api.put(`/customers/${customer.id}/close`, {}, { params: { editedBy: user?.name, reason: 'Fully collected — account closed' } })
+      setSuccessMsg('Account closed.')
+      load()
+    } catch (e: any) {
+      alert(e?.response?.data?.message || e?.response?.data || 'Could not close account.')
+    } finally {
+      setCloseConfirm(false)
+    }
+  }
+
+  // Clicking a slot on the full schedule: in select mode, toggles that day's checkbox.
+  // Otherwise, if it already has a recorded payment, opens the (admin-only) edit dialog;
+  // if not, opens a quick "add payment for this day" dialog.
   const openTimelineSlot = (t: TimelineEntry) => {
+    if (selectMode) {
+      setSelectedDays((prev) => {
+        const next = new Set(prev)
+        if (next.has(t.installmentNo)) next.delete(t.installmentNo)
+        else next.add(t.installmentNo)
+        return next
+      })
+      return
+    }
     if (t.paymentId) {
       const existing = payments.find((p) => p.id === t.paymentId)
       if (existing && isAdmin) openEdit(existing)
       return
     }
     setAddSlot(t)
-    // Default to the loan's daily installment amount for Paid (the common case) instead of 0,
-    // regardless of whether this slot was Missed, Due, or Pending — the collector can still
-    // adjust it down for a Partial payment.
-    setAddForm({ amount: customer.installmentAmount || 0, type: 'Paid', notes: '' })
+    setAddForm({ amount: installment, type: 'Paid', notes: '' })
   }
 
-  // Keep the amount sensible as the type changes: Paid/Advance default back to the full daily
-  // installment if the field is empty, and Not Paid always collects Rs. 0 (its amount input is
-  // hidden entirely so nothing can be typed into it).
   const handleAddTypeChange = (type: PaymentType) => {
     setAddForm((f) => {
       if (type === 'NotPaid') return { ...f, type, amount: 0 }
-      if ((type === 'Paid' || type === 'Advance') && !f.amount) {
-        return { ...f, type, amount: customer.installmentAmount || 0 }
-      }
+      if (type === 'Paid' && !f.amount) return { ...f, type, amount: installment }
+      if (type === 'Advance' && f.type !== 'Advance') return { ...f, type, amount: 0 }
       return { ...f, type }
     })
   }
@@ -121,10 +147,11 @@ export default function CustomerDetail() {
     if (!addSlot) return
     setAddSubmitting(true)
     try {
+      const amount = addForm.type === 'NotPaid' ? 0 : addForm.type === 'Advance' ? toTotal(addForm.amount) : addForm.amount
       await api.post('/payments', {
         customerId: customer.id,
         date: addSlot.date,
-        amount: addForm.type === 'NotPaid' ? 0 : addForm.amount,
+        amount,
         type: addForm.type,
         collectedBy: user?.name || 'Staff',
         notes: addForm.notes || `Added from timeline (Day ${addSlot.installmentNo})`
@@ -133,6 +160,57 @@ export default function CustomerDetail() {
       load()
     } finally {
       setAddSubmitting(false)
+    }
+  }
+
+  const toggleSelectMode = () => {
+    setSelectMode((v) => !v)
+    setSelectedDays(new Set())
+  }
+
+  const selectedEntries = timeline.filter((t) => selectedDays.has(t.installmentNo))
+
+  const bulkMark = async (type: 'Paid' | 'NotPaid') => {
+    if (selectedEntries.length === 0) return
+    setBulkBusy(true)
+    try {
+      await Promise.all(selectedEntries.map((t) => {
+        const amount = type === 'Paid' ? installment : 0
+        if (t.paymentId) {
+          return api.put(`/payments/${t.paymentId}`, {
+            amount, type, editedBy: user?.name, reason: 'Bulk update from full schedule'
+          }, { params: { editedBy: user?.name, reason: 'Bulk update from full schedule' } })
+        }
+        return api.post('/payments', {
+          customerId: customer.id,
+          date: t.date,
+          amount,
+          type,
+          collectedBy: user?.name || 'Staff',
+          notes: `Bulk marked ${type} from full schedule (Day ${t.installmentNo})`
+        })
+      }))
+      setSuccessMsg(`${selectedEntries.length} day(s) marked ${type === 'Paid' ? 'Paid' : 'Not Paid'}.`)
+      setSelectedDays(new Set())
+      load()
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const bulkRemoveMarking = async () => {
+    const toRemove = selectedEntries.filter((t) => t.paymentId)
+    if (toRemove.length === 0) return
+    setBulkBusy(true)
+    try {
+      await Promise.all(toRemove.map((t) =>
+        api.delete(`/payments/${t.paymentId}`, { params: { deletedBy: user?.name, reason: 'Bulk removed from full schedule' } })
+      ))
+      setSuccessMsg(`Cleared marking on ${toRemove.length} day(s).`)
+      setSelectedDays(new Set())
+      load()
+    } finally {
+      setBulkBusy(false)
     }
   }
 
@@ -174,11 +252,28 @@ export default function CustomerDetail() {
               <Button variant="secondary" size="sm"><Pencil size={14} /> Edit</Button>
             </Link>
           )}
+          {isAdmin && customer.status === 'Completed' && (
+            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setCloseConfirm(true)}>
+              <ShieldCheck size={14} /> Close This Account
+            </Button>
+          )}
           {isAdmin && (
             <Button variant="danger" size="sm" onClick={() => setDeleteConfirm(true)}><Trash2 size={14} /> Delete</Button>
           )}
         </div>
       </div>
+
+      {successMsg && (
+        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 text-sm rounded-lg px-4 py-2">
+          {successMsg}
+        </div>
+      )}
+
+      {customer.status === 'Completed' && (
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-sm rounded-lg px-4 py-2">
+          This loan is fully collected. {isAdmin ? 'Use "Close This Account" above to close it out — closed accounts are removed from active/Running totals.' : 'An admin can close this account from here.'}
+        </div>
+      )}
 
       {otherLoans.length > 0 && (
         <Card className="p-4">
@@ -227,17 +322,9 @@ export default function CustomerDetail() {
           <Row label="Start Date" value={formatDate(customer.startDate)} />
           <Row label="End Date (Est.)" value={customer.endDate ? formatDate(customer.endDate) : '—'} />
           <Row label="Total Pending" value={formatCurrency(customer.pendingAmount)} />
-
-          {customer.status === 'Running' && (
-            <div className="flex gap-2 pt-3">
-              <Button size="sm" variant="success" className="flex-1" onClick={() => setPendingAction('Paid')}>
-                <CheckCircle2 size={14} /> Paid
-              </Button>
-              <Button size="sm" variant="danger" className="flex-1" onClick={() => setPendingAction('NotPaid')}>
-                <XCircle size={14} /> Not Paid
-              </Button>
-            </div>
-          )}
+          <p className="text-xs text-gray-400 dark:text-gray-500 pt-2">
+            Use the Full Schedule below to record or edit any day&apos;s payment.
+          </p>
         </Card>
 
         <Card className="lg:col-span-2">
@@ -273,31 +360,62 @@ export default function CustomerDetail() {
         </Card>
 
         <Card className="lg:col-span-3">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
             <CardTitle>Full {customer.totalInstallments}-{customer.financeType === 'Weekly' ? 'Week' : 'Day'} Schedule</CardTitle>
+            {isAdmin && (
+              <Button size="sm" variant={selectMode ? 'secondary' : 'secondary'} onClick={toggleSelectMode}>
+                {selectMode ? <><XIcon size={14} /> Cancel Selection</> : <><CheckSquare size={14} /> Select Days</>}
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             {timeline.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500">No schedule available.</p>}
             <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-              Click any day to {isAdmin ? 'add or edit' : 'add'} its payment.
+              {selectMode
+                ? 'Tap days to select them, then choose a bulk action below.'
+                : `Click any day to ${isAdmin ? 'add or edit' : 'add'} its payment.`}
             </p>
+
+            {selectMode && (
+              <div className="flex flex-wrap items-center gap-2 mb-3 bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-700 rounded-lg px-3 py-2">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{selectedDays.size} selected</span>
+                <Button size="sm" variant="success" disabled={bulkBusy || selectedDays.size === 0} onClick={() => bulkMark('Paid')}>
+                  Mark Paid
+                </Button>
+                <Button size="sm" variant="danger" disabled={bulkBusy || selectedDays.size === 0} onClick={() => bulkMark('NotPaid')}>
+                  Mark Not Paid
+                </Button>
+                <Button size="sm" variant="secondary" disabled={bulkBusy || selectedEntries.every((t) => !t.paymentId)} onClick={bulkRemoveMarking}>
+                  <XCircleIcon size={14} /> Remove Marking
+                </Button>
+                {bulkBusy && <span className="text-xs text-gray-400">Saving...</span>}
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-1.5 max-h-[320px] overflow-y-auto pr-1">
               {timeline.map((t) => {
-                const clickable = !t.paymentId || isAdmin
+                const clickable = selectMode || !t.paymentId || isAdmin
+                const isSelected = selectedDays.has(t.installmentNo)
                 return (
                   <button
                     type="button"
                     key={t.installmentNo}
                     onClick={() => openTimelineSlot(t)}
                     disabled={!clickable}
-                    title={`Day ${t.installmentNo} · ${formatDate(t.date)} · ${t.status}${t.amount ? ' · ' + formatCurrency(t.amount) : ''}${clickable ? ' · click to ' + (t.paymentId ? 'edit' : 'add') : ''}`}
+                    title={`Day ${t.installmentNo} · ${formatDate(t.date)} · ${t.status}${t.amount ? ' · ' + formatCurrency(t.amount) : ''}${clickable && !selectMode ? ' · click to ' + (t.paymentId ? 'edit' : 'add') : ''}`}
                     className={
-                      'w-14 sm:w-16 rounded-md px-1.5 py-1.5 text-center border transition ' +
+                      'relative w-14 sm:w-16 rounded-md px-1.5 py-1.5 text-center border transition ' +
                       timelineColor(t.status) +
                       (t.today ? ' ring-2 ring-blue-500' : '') +
+                      (isSelected ? ' ring-2 ring-offset-1 ring-purple-500' : '') +
                       (clickable ? ' hover:brightness-95 cursor-pointer' : ' cursor-default opacity-90')
                     }
                   >
+                    {selectMode && (
+                      <span className="absolute top-0.5 right-0.5 text-purple-600 dark:text-purple-300">
+                        {isSelected ? <CheckSquare size={12} /> : <Square size={12} />}
+                      </span>
+                    )}
                     <p className="text-[10px] font-semibold leading-tight">#{t.installmentNo}</p>
                     <p className="text-[9px] leading-tight opacity-80">{formatDate(t.date).replace(/, \d{4}$/, '')}</p>
                     <p className="text-[10px] font-medium leading-tight mt-0.5">{t.status}</p>
@@ -346,15 +464,6 @@ export default function CustomerDetail() {
         </Card>
       </div>
 
-      <ConfirmDialog
-        open={!!pendingAction}
-        title={`Mark as ${pendingAction === 'Paid' ? 'Paid' : 'Not Paid'}?`}
-        message={`Are you sure you want to mark this as ${pendingAction === 'Paid' ? 'Paid' : 'Not Paid'}?`}
-        onConfirm={handleMarkPayment}
-        onCancel={() => setPendingAction(null)}
-        danger={pendingAction === 'NotPaid'}
-      />
-
       {isAdmin && (
         <ConfirmDialog
           open={deleteConfirm}
@@ -364,6 +473,17 @@ export default function CustomerDetail() {
           onConfirm={handleDelete}
           onCancel={() => setDeleteConfirm(false)}
           danger
+        />
+      )}
+
+      {isAdmin && (
+        <ConfirmDialog
+          open={closeConfirm}
+          title="Close this account?"
+          message={`${customer.name}'s loan is fully collected. Closing it removes this loan from active/Running totals across the app. This can't be undone from here.`}
+          confirmLabel="Close Account"
+          onConfirm={submitClose}
+          onCancel={() => setCloseConfirm(false)}
         />
       )}
 
@@ -394,9 +514,16 @@ export default function CustomerDetail() {
               <p className="text-xs text-gray-400 dark:text-gray-500">Not Paid always records Rs. 0 &mdash; no amount needed.</p>
             ) : (
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {editForm.type === 'Advance' ? `Extra advance (on top of today's ${formatCurrency(installment)})` : 'Amount'}
+                </label>
                 <input type="number" className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
                   value={editForm.amount} onChange={(e) => setEditForm((f) => ({ ...f, amount: Number(e.target.value) }))} />
+                {editForm.type === 'Advance' && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    Total to be recorded: {formatCurrency(toTotal(editForm.amount))} ({formatCurrency(installment)} today + {formatCurrency(editForm.amount)} extra)
+                  </p>
+                )}
               </div>
             )}
             <div>
@@ -428,7 +555,7 @@ export default function CustomerDetail() {
             <Button variant="secondary" onClick={() => setAddSlot(null)}>Cancel</Button>
             <Button
               onClick={submitAddSlot}
-              disabled={addSubmitting || (addForm.type !== 'NotPaid' && !(addForm.amount > 0))}
+              disabled={addSubmitting || (addForm.type !== 'NotPaid' && addForm.type !== 'Advance' && !(addForm.amount > 0))}
             >
               {addSubmitting ? 'Saving...' : 'Save'}
             </Button>
@@ -451,11 +578,20 @@ export default function CustomerDetail() {
           ) : (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Amount {addForm.type === 'Paid' && customer.installmentAmount ? `(defaults to the daily installment, ${formatCurrency(customer.installmentAmount)})` : ''}
+                {addForm.type === 'Advance'
+                  ? `Extra advance (on top of today's ${formatCurrency(installment)})`
+                  : addForm.type === 'Paid' && installment
+                  ? `Amount (defaults to the daily installment, ${formatCurrency(installment)})`
+                  : 'Amount'}
               </label>
-              <input type="number" min={1} autoFocus
+              <input type="number" min={0} autoFocus
                 className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
                 value={addForm.amount} onChange={(e) => setAddForm((f) => ({ ...f, amount: Number(e.target.value) }))} />
+              {addForm.type === 'Advance' && (
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  Total to be recorded: {formatCurrency(toTotal(addForm.amount))} ({formatCurrency(installment)} today + {formatCurrency(addForm.amount)} extra)
+                </p>
+              )}
             </div>
           )}
           <div>

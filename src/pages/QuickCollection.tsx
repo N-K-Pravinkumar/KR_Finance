@@ -84,7 +84,11 @@ export default function QuickCollection() {
 
   const handleAmountConfirm = async () => {
     if (!amountAction) return
-    const amount = Number(amountValue)
+    const entered = Number(amountValue)
+    if (!(entered >= 0)) return
+    // Advance means "today's installment, plus this much extra" — the entered value is the
+    // extra on top, and the total actually recorded/charged includes today's amount too.
+    const amount = amountAction.type === 'Advance' ? (amountAction.customer.installmentAmount || 0) + entered : entered
     if (!(amount > 0)) return
     setSubmitting(true)
     try {
@@ -194,7 +198,7 @@ export default function QuickCollection() {
         })}
         {grouped.length === 0 && (
           <p className="text-sm text-gray-400 dark:text-gray-500 col-span-full text-center py-10">
-            No collections due right now. Today&apos;s installments appear here after 12:00 PM.
+            No collections due right now. Already-marked loans stay off this list until the next day rolls over at 12:00 AM IST.
           </p>
         )}
       </div>
@@ -228,15 +232,25 @@ export default function QuickCollection() {
         }
       >
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {amountAction?.type === 'Advance'
+              ? `Extra advance (on top of today's ${formatCurrency(amountAction.customer.installmentAmount)})`
+              : 'Amount'}
+          </label>
           <input
             type="number"
-            min={1}
+            min={amountAction?.type === 'Advance' ? 0 : 1}
             className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
             value={amountValue}
             onChange={(e) => setAmountValue(e.target.value)}
             autoFocus
           />
+          {amountAction?.type === 'Advance' && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              Total to be recorded: {formatCurrency((amountAction.customer.installmentAmount || 0) + (Number(amountValue) || 0))}
+              {' '}({formatCurrency(amountAction.customer.installmentAmount)} today + {formatCurrency(Number(amountValue) || 0)} extra)
+            </p>
+          )}
         </div>
       </Dialog>
     </div>

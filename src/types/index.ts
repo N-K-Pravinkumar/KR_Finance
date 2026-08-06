@@ -85,4 +85,33 @@ export interface OrgSummary {
   completedCount: number
   closedCount: number
   overdueCount: number
+  todayToCollect?: number
+  todayCollected?: number
+  todayNotCollected?: number
+}
+
+export interface DailyReportRow {
+  customerId: number
+  name: string
+  mobile: string
+  totalLoanAmount: number
+  totalPaid: number
+  balanceAmount: number
+  dailyCollection: number
+  daysPaid: number
+  totalInstallments: number
+  todayStatus: 'Paid' | 'Partial' | 'NotPaid' | 'Advance' | 'Pending' | 'Not Due Yet'
+  todayAmount?: number
+}
+
+export interface DailyReport {
+  date: string
+  totalToCollect: number
+  totalCollected: number
+  totalNotCollected: number
+  paidCount: number
+  notPaidCount: number
+  partialCount: number
+  advanceCount: number
+  rows: DailyReportRow[]
 }
