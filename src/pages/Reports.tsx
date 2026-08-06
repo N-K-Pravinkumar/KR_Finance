@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { MessageCircle, MessageSquare, Download, FileText, FileSpreadsheet, Search } from 'lucide-react'
+import {
+  MessageCircle, MessageSquare, Download, FileText, FileSpreadsheet, Search,
+  Wallet, TrendingUp, TrendingDown, CalendarClock, IndianRupee, CheckCircle2, XCircle
+} from 'lucide-react'
 import { api } from '../api/client'
 import { Customer, Payment, OrgSummary, DailyReport } from '../types'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
@@ -29,6 +32,24 @@ async function downloadBlob(url: string, params: Record<string, any>, filename: 
 
 const PDF_MIME = 'application/pdf'
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+/** Dashboard-style KPI tile: icon chip + big bold value + label — used to give the Reports
+ * page the same premium at-a-glance summary look as the Dashboard's own stat cards. */
+function StatTile({ label, value, icon: Icon, color }: { label: string; value: string | number; icon: React.ElementType; color: string }) {
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between">
+        <div className="min-w-0">
+          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{label}</p>
+          <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mt-1 truncate">{value}</p>
+        </div>
+        <div className={`p-2 rounded-lg shrink-0 ${color}`}>
+          <Icon size={20} />
+        </div>
+      </div>
+    </Card>
+  )
+}
 
 export default function Reports() {
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -155,18 +176,18 @@ export default function Reports() {
 
       {summary && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <Card className="p-4"><p className="text-xs text-gray-500 dark:text-gray-400">Total Financed</p><p className="text-lg font-bold text-gray-900 dark:text-gray-100">{formatCurrency(summary.totalFinanced)}</p></Card>
-          <Card className="p-4"><p className="text-xs text-gray-500 dark:text-gray-400">Total Collected</p><p className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(summary.totalCollected)}</p></Card>
-          <Card className="p-4"><p className="text-xs text-gray-500 dark:text-gray-400">Total Pending</p><p className="text-lg font-bold text-amber-600 dark:text-amber-400">{formatCurrency(summary.totalPending)}</p></Card>
-          <Card className="p-4"><p className="text-xs text-gray-500 dark:text-gray-400">Overdue Customers</p><p className="text-lg font-bold text-red-600 dark:text-red-400">{summary.overdueCount}</p></Card>
+          <StatTile label="Total Financed" value={formatCurrency(summary.totalFinanced)} icon={IndianRupee} color="text-gray-600 bg-gray-100 dark:bg-gray-700" />
+          <StatTile label="Total Collected" value={formatCurrency(summary.totalCollected)} icon={Wallet} color="text-green-600 bg-green-50 dark:bg-green-900/30" />
+          <StatTile label="Total Pending" value={formatCurrency(summary.totalPending)} icon={CalendarClock} color="text-amber-600 bg-amber-50 dark:bg-amber-900/30" />
+          <StatTile label="Overdue Customers" value={summary.overdueCount} icon={TrendingDown} color="text-red-600 bg-red-50 dark:bg-red-900/30" />
         </div>
       )}
 
       {summary && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Card className="p-4"><p className="text-xs text-gray-500 dark:text-gray-400">Today&apos;s Total Collection (Due)</p><p className="text-lg font-bold text-gray-900 dark:text-gray-100">{formatCurrency(summary.todayToCollect)}</p></Card>
-          <Card className="p-4"><p className="text-xs text-gray-500 dark:text-gray-400">Today&apos;s Collected Amount</p><p className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(summary.todayCollected)}</p></Card>
-          <Card className="p-4"><p className="text-xs text-gray-500 dark:text-gray-400">Today&apos;s Pending Amount</p><p className="text-lg font-bold text-amber-600 dark:text-amber-400">{formatCurrency(summary.todayNotCollected)}</p></Card>
+          <StatTile label="Today's Total Collection (Due)" value={formatCurrency(summary.todayToCollect)} icon={TrendingUp} color="text-blue-600 bg-blue-50 dark:bg-blue-900/30" />
+          <StatTile label="Today's Collected Amount" value={formatCurrency(summary.todayCollected)} icon={CheckCircle2} color="text-green-600 bg-green-50 dark:bg-green-900/30" />
+          <StatTile label="Today's Pending Amount" value={formatCurrency(summary.todayNotCollected)} icon={XCircle} color="text-red-600 bg-red-50 dark:bg-red-900/30" />
         </div>
       )}
 
@@ -199,24 +220,19 @@ export default function Reports() {
           </CardHeader>
           <CardContent className="space-y-3">
             {dailyReport && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                <div className="border border-gray-100 dark:border-gray-700 rounded-lg p-2.5">
-                  <p className="text-gray-400 dark:text-gray-500">To Collect</p>
-                  <p className="font-bold text-gray-900 dark:text-gray-100">{formatCurrency(dailyReport.totalToCollect)}</p>
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <StatTile label="To Collect Today" value={formatCurrency(dailyReport.totalToCollect)} icon={TrendingUp} color="text-blue-600 bg-blue-50 dark:bg-blue-900/30" />
+                  <StatTile label="Collected Today" value={formatCurrency(dailyReport.totalCollected)} icon={Wallet} color="text-green-600 bg-green-50 dark:bg-green-900/30" />
+                  <StatTile label="Not Collected" value={formatCurrency(dailyReport.totalNotCollected)} icon={TrendingDown} color="text-red-600 bg-red-50 dark:bg-red-900/30" />
                 </div>
-                <div className="border border-gray-100 dark:border-gray-700 rounded-lg p-2.5">
-                  <p className="text-gray-400 dark:text-gray-500">Collected</p>
-                  <p className="font-bold text-green-600 dark:text-green-400">{formatCurrency(dailyReport.totalCollected)}</p>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <Badge color="green">Paid {dailyReport.paidCount}</Badge>
+                  <Badge color="red">Not Paid {dailyReport.notPaidCount}</Badge>
+                  <Badge color="yellow">Partial {dailyReport.partialCount}</Badge>
+                  <Badge color="purple">Advance {dailyReport.advanceCount}</Badge>
                 </div>
-                <div className="border border-gray-100 dark:border-gray-700 rounded-lg p-2.5">
-                  <p className="text-gray-400 dark:text-gray-500">Not Collected</p>
-                  <p className="font-bold text-red-600 dark:text-red-400">{formatCurrency(dailyReport.totalNotCollected)}</p>
-                </div>
-                <div className="border border-gray-100 dark:border-gray-700 rounded-lg p-2.5">
-                  <p className="text-gray-400 dark:text-gray-500">Paid / Not Paid / Partial / Advance</p>
-                  <p className="font-bold text-gray-900 dark:text-gray-100">{dailyReport.paidCount} / {dailyReport.notPaidCount} / {dailyReport.partialCount} / {dailyReport.advanceCount}</p>
-                </div>
-              </div>
+              </>
             )}
 
             <div className="relative">
