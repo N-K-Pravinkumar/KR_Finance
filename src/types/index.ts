@@ -115,3 +115,26 @@ export interface DailyReport {
   advanceCount: number
   rows: DailyReportRow[]
 }
+
+export type CashExpenseCategory = 'PetrolAllowance' | 'FoodAllowance' | 'Salary' | 'SentToPerson' | 'Other'
+
+export interface CashExpense {
+  id: number
+  date: string
+  amount: number
+  category: CashExpenseCategory
+  recipientName?: string
+  sentVia?: string
+  notes?: string
+  createdBy: string
+  createdAt: string
+}
+
+export interface CashLedgerSummary {
+  date: string
+  openingBalance: number
+  collectedToday: number
+  expensesToday: number
+  closingBalance: number
+  expenses: CashExpense[]
+}

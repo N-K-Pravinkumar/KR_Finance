@@ -39,7 +39,8 @@ export default function CustomerDetail() {
   const [financeEditMode, setFinanceEditMode] = useState(false)
   const [financeForm, setFinanceForm] = useState({
     financeAmount: 0, interest: 0, installmentAmount: 0, totalInstallments: 100,
-    financeType: 'Daily' as Customer['financeType'], collectionDay: '', startDate: ''
+    financeType: 'Daily' as Customer['financeType'], collectionDay: '', startDate: '',
+    totalPaid: 0, paidInstallments: 0
   })
   const [financeSaving, setFinanceSaving] = useState(false)
 
@@ -128,7 +129,9 @@ export default function CustomerDetail() {
       totalInstallments: customer.totalInstallments || 100,
       financeType: customer.financeType,
       collectionDay: customer.collectionDay || '',
-      startDate: customer.startDate.slice(0, 10)
+      startDate: customer.startDate.slice(0, 10),
+      totalPaid: customer.totalPaid || 0,
+      paidInstallments: customer.paidInstallments || 0
     })
     setFinanceEditMode(true)
   }
@@ -147,7 +150,9 @@ export default function CustomerDetail() {
         totalInstallments: financeForm.totalInstallments,
         financeType: financeForm.financeType,
         collectionDay: financeForm.financeType === 'Weekly' ? financeForm.collectionDay : null,
-        startDate: financeForm.startDate
+        startDate: financeForm.startDate,
+        totalPaid: financeForm.totalPaid,
+        paidInstallments: financeForm.paidInstallments
       }
       await api.put(`/customers/${customer.id}`, payload, { params: { editedBy: user?.name, reason: 'Finance summary edited from detail page' } })
       setFinanceEditMode(false)
@@ -396,6 +401,13 @@ export default function CustomerDetail() {
               )}
               <FinanceField label="Start Date" type="date" value={financeForm.startDate}
                 onChange={(v) => setFinanceForm((f) => ({ ...f, startDate: v }))} />
+              <FinanceField label="Total Paid (Rs.)" type="number" value={financeForm.totalPaid}
+                onChange={(v) => setFinanceForm((f) => ({ ...f, totalPaid: Number(v) }))} />
+              <FinanceField label="Installments Paid" type="number" value={financeForm.paidInstallments}
+                onChange={(v) => setFinanceForm((f) => ({ ...f, paidInstallments: Number(v) }))} />
+              <p className="text-xs text-amber-600 dark:text-amber-400 -mt-2">
+                Total Amount, Current Balance and Total Pending are calculated automatically from these values.
+              </p>
               <div className="flex gap-2 pt-1">
                 <Button size="sm" className="flex-1" disabled={financeSaving} onClick={submitFinanceEdit}>
                   {financeSaving ? 'Saving...' : 'Save Changes'}
@@ -475,20 +487,32 @@ export default function CustomerDetail() {
                 : `Click any day to ${isAdmin ? 'add or edit' : 'add'} its payment.`}
             </p>
 
-            {selectMode && (
-              <div className="flex flex-wrap items-center gap-2 mb-3 bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-700 rounded-lg px-3 py-2">
-                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{selectedDays.size} selected</span>
-                <Button size="sm" variant="success" disabled={bulkBusy || selectedDays.size === 0} onClick={() => bulkMark('Paid')}>
-                  Mark Paid
-                </Button>
-                <Button size="sm" variant="danger" disabled={bulkBusy || selectedDays.size === 0} onClick={() => bulkMark('NotPaid')}>
-                  Mark Not Paid
-                </Button>
-                <Button size="sm" variant="secondary" disabled={bulkBusy || selectedEntries.every((t) => !t.paymentId)} onClick={bulkRemoveMarking}>
-                  <XCircleIcon size={14} /> Mark as Not Marked
-                </Button>
-                {bulkBusy && <span className="text-xs text-gray-400">Saving...</span>}
+            {selectMode && selectedDays.size > 0 && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                <div className="absolute inset-0 bg-black/40" onClick={() => setSelectedDays(new Set())} />
+                <div className="relative bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl shadow-xl p-5">
+                  <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">Bulk update days</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{selectedDays.size} day{selectedDays.size === 1 ? '' : 's'} selected</p>
+                  <div className="flex flex-col gap-2">
+                    <Button variant="success" disabled={bulkBusy} onClick={() => bulkMark('Paid')}>
+                      Mark Paid
+                    </Button>
+                    <Button variant="danger" disabled={bulkBusy} onClick={() => bulkMark('NotPaid')}>
+                      Mark Not Paid
+                    </Button>
+                    <Button variant="secondary" disabled={bulkBusy || selectedEntries.every((t) => !t.paymentId)} onClick={bulkRemoveMarking}>
+                      <XCircleIcon size={14} /> Mark as Not Marked
+                    </Button>
+                    <Button variant="ghost" disabled={bulkBusy} onClick={() => setSelectedDays(new Set())}>
+                      Cancel
+                    </Button>
+                  </div>
+                  {bulkBusy && <p className="text-xs text-gray-400 mt-3 text-center">Saving...</p>}
+                </div>
               </div>
+            )}
+            {selectMode && selectedDays.size === 0 && (
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Select one or more days to open bulk actions.</p>
             )}
 
             <div className="grid grid-cols-3 xs:grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2 max-h-[420px] overflow-y-auto pr-1 pb-1">

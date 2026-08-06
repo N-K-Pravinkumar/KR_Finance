@@ -11,6 +11,7 @@ import CustomerForm from './pages/CustomerForm'
 import CustomerDetail from './pages/CustomerDetail'
 import Reports from './pages/Reports'
 import AuditLog from './pages/AuditLog'
+import CashLedger from './pages/CashLedger'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
@@ -36,6 +37,7 @@ function AppRoutes() {
       <Route path="/customers/:id" element={<PrivateRoute><CustomerDetail /></PrivateRoute>} />
       <Route path="/customers/:id/edit" element={<PrivateRoute><CustomerForm /></PrivateRoute>} />
       <Route path="/reports" element={<PrivateRoute><Reports /></PrivateRoute>} />
+      <Route path="/cash-ledger" element={<AdminRoute><CashLedger /></AdminRoute>} />
       <Route path="/audit-log" element={<AdminRoute><AuditLog /></AdminRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
