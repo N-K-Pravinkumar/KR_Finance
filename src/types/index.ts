@@ -49,7 +49,7 @@ export interface Payment {
 export interface TimelineEntry {
   installmentNo: number
   date: string
-  status: 'Paid' | 'Partial' | 'NotPaid' | 'Advance' | 'Pending' | 'Due' | 'Missed'
+  status: 'Paid' | 'Partial' | 'NotPaid' | 'Advance' | 'Pending' | 'Due' | 'NotMarked'
   amount?: number
   paymentId?: number
   today: boolean

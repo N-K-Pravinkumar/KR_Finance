@@ -229,7 +229,8 @@ export default function Reports() {
               />
             </div>
 
-            <div className="overflow-x-auto">
+            {/* Desktop/tablet table */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 text-xs uppercase">
                   <tr>
@@ -259,8 +260,30 @@ export default function Reports() {
                   ))}
                 </tbody>
               </table>
-              {dailyRows.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">No customers found.</p>}
             </div>
+
+            {/* Mobile cards (iPhone-width friendly) */}
+            <div className="sm:hidden space-y-2">
+              {dailyRows.map((r) => (
+                <div key={r.customerId} className="border border-gray-100 dark:border-gray-700 rounded-lg p-3">
+                  <div className="flex items-start justify-between mb-1.5">
+                    <div>
+                      <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{r.name}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">{r.mobile}</p>
+                    </div>
+                    <Badge color={statusBadgeColor(r.todayStatus)}>{r.todayStatus}</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 text-xs text-gray-500 dark:text-gray-400">
+                    <p>Daily: <span className="text-gray-800 dark:text-gray-200 font-medium">{formatCurrency(r.dailyCollection)}</span></p>
+                    <p>Today: <span className="text-gray-800 dark:text-gray-200 font-medium">{r.todayAmount != null ? formatCurrency(r.todayAmount) : '—'}</span></p>
+                    <p>Balance: <span className="text-gray-800 dark:text-gray-200 font-medium">{formatCurrency(r.balanceAmount)}</span></p>
+                    <p>Days Paid: <span className="text-gray-800 dark:text-gray-200 font-medium">{r.daysPaid} / {r.totalInstallments}</span></p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {dailyRows.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">No customers found.</p>}
           </CardContent>
         </Card>
       )}

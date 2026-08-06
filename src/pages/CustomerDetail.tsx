@@ -35,6 +35,14 @@ export default function CustomerDetail() {
   const [bulkBusy, setBulkBusy] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
 
+  // Inline editing of the Finance Summary card, right on the detail page.
+  const [financeEditMode, setFinanceEditMode] = useState(false)
+  const [financeForm, setFinanceForm] = useState({
+    financeAmount: 0, interest: 0, installmentAmount: 0, totalInstallments: 100,
+    financeType: 'Daily' as Customer['financeType'], collectionDay: '', startDate: ''
+  })
+  const [financeSaving, setFinanceSaving] = useState(false)
+
   const load = () => {
     api.get<Customer>(`/customers/${id}`).then((r) => setCustomer(r.data))
     api.get<Payment[]>(`/payments/customer/${id}`).then((r) => setPayments(r.data))
@@ -109,6 +117,44 @@ export default function CustomerDetail() {
       alert(e?.response?.data?.message || e?.response?.data || 'Could not close account.')
     } finally {
       setCloseConfirm(false)
+    }
+  }
+
+  const openFinanceEdit = () => {
+    setFinanceForm({
+      financeAmount: customer.financeAmount || 0,
+      interest: customer.interest || 0,
+      installmentAmount: customer.installmentAmount || 0,
+      totalInstallments: customer.totalInstallments || 100,
+      financeType: customer.financeType,
+      collectionDay: customer.collectionDay || '',
+      startDate: customer.startDate.slice(0, 10)
+    })
+    setFinanceEditMode(true)
+  }
+
+  const submitFinanceEdit = async () => {
+    setFinanceSaving(true)
+    try {
+      // The backend's update endpoint expects the full customer object (it isn't a partial
+      // PATCH), so everything not being edited here is passed through unchanged from the
+      // currently-loaded customer to avoid accidentally wiping name/mobile/address/etc.
+      const payload = {
+        ...customer,
+        financeAmount: financeForm.financeAmount,
+        interest: financeForm.interest,
+        installmentAmount: financeForm.installmentAmount,
+        totalInstallments: financeForm.totalInstallments,
+        financeType: financeForm.financeType,
+        collectionDay: financeForm.financeType === 'Weekly' ? financeForm.collectionDay : null,
+        startDate: financeForm.startDate
+      }
+      await api.put(`/customers/${customer.id}`, payload, { params: { editedBy: user?.name, reason: 'Finance summary edited from detail page' } })
+      setFinanceEditMode(false)
+      setSuccessMsg('Finance summary updated.')
+      load()
+    } finally {
+      setFinanceSaving(false)
     }
   }
 
@@ -242,10 +288,10 @@ export default function CustomerDetail() {
         </div>
         <div className="flex gap-2 flex-wrap">
           <a href={waLink} target="_blank" rel="noreferrer">
-            <Button variant="success" size="sm"><MessageCircle size={14} /> WhatsApp Reminder</Button>
+            <Button variant="success" size="sm"><MessageCircle size={14} /> <span className="hidden sm:inline">WhatsApp Reminder</span><span className="sm:hidden">WhatsApp</span></Button>
           </a>
           <a href={smsLink}>
-            <Button variant="secondary" size="sm"><MessageSquare size={14} /> SMS Reminder</Button>
+            <Button variant="secondary" size="sm"><MessageSquare size={14} /> SMS</Button>
           </a>
           {isAdmin && (
             <Link to={`/customers/${customer.id}/edit`}>
@@ -254,7 +300,7 @@ export default function CustomerDetail() {
           )}
           {isAdmin && customer.status === 'Completed' && (
             <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setCloseConfirm(true)}>
-              <ShieldCheck size={14} /> Close This Account
+              <ShieldCheck size={14} /> <span className="hidden sm:inline">Close This Account</span><span className="sm:hidden">Close</span>
             </Button>
           )}
           {isAdmin && (
@@ -309,22 +355,75 @@ export default function CustomerDetail() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-1 p-4 space-y-2 text-sm">
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Finance Summary</h3>
-          <Row label="Finance Amount" value={formatCurrency(customer.financeAmount)} />
-          <Row label="Interest" value={`${customer.interest}%`} />
-          <Row label="Total Amount" value={formatCurrency(customer.totalAmount)} />
-          <Row label="Total Paid" value={formatCurrency(customer.totalPaid)} />
-          <Row label="Current Balance" value={formatCurrency(customer.currentBalance)} />
-          <Row label="Installment" value={formatCurrency(customer.installmentAmount)} />
-          <Row label="Type" value={customer.financeType} />
-          {customer.financeType === 'Weekly' && <Row label="Collection Day" value={customer.collectionDay || '-'} />}
-          <Row label="Installments Paid" value={`${customer.paidInstallments} / ${customer.totalInstallments}`} />
-          <Row label="Start Date" value={formatDate(customer.startDate)} />
-          <Row label="End Date (Est.)" value={customer.endDate ? formatDate(customer.endDate) : '—'} />
-          <Row label="Total Pending" value={formatCurrency(customer.pendingAmount)} />
-          <p className="text-xs text-gray-400 dark:text-gray-500 pt-2">
-            Use the Full Schedule below to record or edit any day&apos;s payment.
-          </p>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Finance Summary</h3>
+            {isAdmin && !financeEditMode && (
+              <button onClick={openFinanceEdit} className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 p-1" title="Edit finance summary">
+                <Pencil size={14} />
+              </button>
+            )}
+          </div>
+
+          {financeEditMode ? (
+            <div className="space-y-3">
+              <FinanceField label="Finance Amount (Rs.)" type="number" value={financeForm.financeAmount}
+                onChange={(v) => setFinanceForm((f) => ({ ...f, financeAmount: Number(v) }))} />
+              <FinanceField label="Interest (%)" type="number" value={financeForm.interest}
+                onChange={(v) => setFinanceForm((f) => ({ ...f, interest: Number(v) }))} />
+              <FinanceField label="Daily/Weekly Installment (Rs.)" type="number" value={financeForm.installmentAmount}
+                onChange={(v) => setFinanceForm((f) => ({ ...f, installmentAmount: Number(v) }))} />
+              <FinanceField label="Total Installments" type="number" value={financeForm.totalInstallments}
+                onChange={(v) => setFinanceForm((f) => ({ ...f, totalInstallments: Number(v) }))} />
+              <div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Type</label>
+                <select className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
+                  value={financeForm.financeType} onChange={(e) => setFinanceForm((f) => ({ ...f, financeType: e.target.value as Customer['financeType'] }))}>
+                  <option value="Daily">Daily</option>
+                  <option value="Weekly">Weekly</option>
+                </select>
+              </div>
+              {financeForm.financeType === 'Weekly' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Collection Day</label>
+                  <select className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
+                    value={financeForm.collectionDay} onChange={(e) => setFinanceForm((f) => ({ ...f, collectionDay: e.target.value }))}>
+                    <option value="">Select day</option>
+                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <FinanceField label="Start Date" type="date" value={financeForm.startDate}
+                onChange={(v) => setFinanceForm((f) => ({ ...f, startDate: v }))} />
+              <div className="flex gap-2 pt-1">
+                <Button size="sm" className="flex-1" disabled={financeSaving} onClick={submitFinanceEdit}>
+                  {financeSaving ? 'Saving...' : 'Save Changes'}
+                </Button>
+                <Button size="sm" variant="secondary" className="flex-1" onClick={() => setFinanceEditMode(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <Row label="Finance Amount" value={formatCurrency(customer.financeAmount)} />
+              <Row label="Interest" value={`${customer.interest}%`} />
+              <Row label="Total Amount" value={formatCurrency(customer.totalAmount)} />
+              <Row label="Total Paid" value={formatCurrency(customer.totalPaid)} />
+              <Row label="Current Balance" value={formatCurrency(customer.currentBalance)} />
+              <Row label="Installment" value={formatCurrency(customer.installmentAmount)} />
+              <Row label="Type" value={customer.financeType} />
+              {customer.financeType === 'Weekly' && <Row label="Collection Day" value={customer.collectionDay || '-'} />}
+              <Row label="Installments Paid" value={`${customer.paidInstallments} / ${customer.totalInstallments}`} />
+              <Row label="Start Date" value={formatDate(customer.startDate)} />
+              <Row label="End Date (Est.)" value={customer.endDate ? formatDate(customer.endDate) : '—'} />
+              <Row label="Total Pending" value={formatCurrency(customer.pendingAmount)} />
+              <p className="text-xs text-gray-400 dark:text-gray-500 pt-2">
+                Use the Full Schedule below to record or edit any day&apos;s payment.
+              </p>
+            </>
+          )}
         </Card>
 
         <Card className="lg:col-span-2">
@@ -386,13 +485,13 @@ export default function CustomerDetail() {
                   Mark Not Paid
                 </Button>
                 <Button size="sm" variant="secondary" disabled={bulkBusy || selectedEntries.every((t) => !t.paymentId)} onClick={bulkRemoveMarking}>
-                  <XCircleIcon size={14} /> Remove Marking
+                  <XCircleIcon size={14} /> Mark as Not Marked
                 </Button>
                 {bulkBusy && <span className="text-xs text-gray-400">Saving...</span>}
               </div>
             )}
 
-            <div className="flex flex-wrap gap-1.5 max-h-[320px] overflow-y-auto pr-1">
+            <div className="grid grid-cols-3 xs:grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2 max-h-[420px] overflow-y-auto pr-1 pb-1">
               {timeline.map((t) => {
                 const clickable = selectMode || !t.paymentId || isAdmin
                 const isSelected = selectedDays.has(t.installmentNo)
@@ -402,9 +501,9 @@ export default function CustomerDetail() {
                     key={t.installmentNo}
                     onClick={() => openTimelineSlot(t)}
                     disabled={!clickable}
-                    title={`Day ${t.installmentNo} · ${formatDate(t.date)} · ${t.status}${t.amount ? ' · ' + formatCurrency(t.amount) : ''}${clickable && !selectMode ? ' · click to ' + (t.paymentId ? 'edit' : 'add') : ''}`}
+                    title={`Day ${t.installmentNo} · ${formatDate(t.date)} · ${statusLabel(t.status)}${t.amount ? ' · ' + formatCurrency(t.amount) : ''}${clickable && !selectMode ? ' · click to ' + (t.paymentId ? 'edit' : 'add') : ''}`}
                     className={
-                      'relative w-14 sm:w-16 rounded-md px-1.5 py-1.5 text-center border transition ' +
+                      'relative rounded-lg px-1.5 py-2 text-center border transition ' +
                       timelineColor(t.status) +
                       (t.today ? ' ring-2 ring-blue-500' : '') +
                       (isSelected ? ' ring-2 ring-offset-1 ring-purple-500' : '') +
@@ -412,15 +511,15 @@ export default function CustomerDetail() {
                     }
                   >
                     {selectMode && (
-                      <span className="absolute top-0.5 right-0.5 text-purple-600 dark:text-purple-300">
-                        {isSelected ? <CheckSquare size={12} /> : <Square size={12} />}
+                      <span className="absolute top-1 right-1 text-purple-600 dark:text-purple-300">
+                        {isSelected ? <CheckSquare size={13} /> : <Square size={13} />}
                       </span>
                     )}
-                    <p className="text-[10px] font-semibold leading-tight">#{t.installmentNo}</p>
-                    <p className="text-[9px] leading-tight opacity-80">{formatDate(t.date).replace(/, \d{4}$/, '')}</p>
-                    <p className="text-[10px] font-medium leading-tight mt-0.5">{t.status}</p>
-                    {t.amount != null && t.status !== 'Missed' && (
-                      <p className="text-[9px] leading-tight opacity-80">{formatCurrency(t.amount)}</p>
+                    <p className="text-[11px] font-semibold leading-tight">Day {t.installmentNo}</p>
+                    <p className="text-[11px] font-medium leading-tight mt-0.5">{formatDate(t.date)}</p>
+                    <p className="text-[10px] leading-tight mt-1 font-semibold uppercase tracking-wide">{statusLabel(t.status)}</p>
+                    {t.amount != null && (
+                      <p className="text-[10px] leading-tight opacity-90 mt-0.5">{formatCurrency(t.amount)}</p>
                     )}
                   </button>
                 )
@@ -430,7 +529,8 @@ export default function CustomerDetail() {
               <LegendDot color="bg-green-100 border-green-300 text-green-700" label="Paid" />
               <LegendDot color="bg-yellow-100 border-yellow-300 text-yellow-700" label="Partial" />
               <LegendDot color="bg-purple-100 border-purple-300 text-purple-700" label="Advance" />
-              <LegendDot color="bg-red-100 border-red-300 text-red-700" label="Not Paid / Missed" />
+              <LegendDot color="bg-red-100 border-red-300 text-red-700" label="Not Paid" />
+              <LegendDot color="bg-slate-200 border-slate-400 text-slate-700" label="Not Marked" />
               <LegendDot color="bg-blue-100 border-blue-300 text-blue-700" label="Due Today" />
               <LegendDot color="bg-gray-100 border-gray-300 text-gray-500" label="Pending (future)" />
             </div>
@@ -614,6 +714,20 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
+function FinanceField({ label, value, onChange, type = 'text' }: { label: string; value: any; onChange: (v: string) => void; type?: string }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{label}</label>
+      <input
+        type={type}
+        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  )
+}
+
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between">
@@ -628,11 +742,18 @@ function timelineColor(status: string): string {
     case 'Paid': return 'bg-green-100 border-green-300 text-green-700'
     case 'Partial': return 'bg-yellow-100 border-yellow-300 text-yellow-700'
     case 'Advance': return 'bg-purple-100 border-purple-300 text-purple-700'
-    case 'NotPaid':
-    case 'Missed': return 'bg-red-100 border-red-300 text-red-700'
+    // Explicit "Not Paid" (a collector visited and it genuinely wasn't paid) stays red.
+    case 'NotPaid': return 'bg-red-100 border-red-300 text-red-700'
+    // "Not Marked" (nobody ever recorded anything for that day) is a distinct neutral slate
+    // color — it's not the same as a confirmed non-payment.
+    case 'NotMarked': return 'bg-slate-200 border-slate-400 text-slate-700 dark:bg-slate-700 dark:border-slate-500 dark:text-slate-200'
     case 'Due': return 'bg-blue-100 border-blue-300 text-blue-700'
     default: return 'bg-gray-100 border-gray-300 text-gray-500'
   }
+}
+
+function statusLabel(status: string): string {
+  return status === 'NotMarked' ? 'Not Marked' : status === 'NotPaid' ? 'Not Paid' : status
 }
 
 function LegendDot({ color, label }: { color: string; label: string }) {

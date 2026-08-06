@@ -4,6 +4,11 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      screens: {
+        // Fine-tunes layouts between phone sizes (iPhone SE ~375px up through iPhone 13/14 ~390px,
+        // Pro Max ~430px) before Tailwind's default `sm` (640px) kicks in.
+        xs: '400px'
+      },
       colors: {
         primary: {
           50: '#eff6ff',
