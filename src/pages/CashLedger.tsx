@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { Wallet, Plus, Trash2, TrendingUp, TrendingDown, PiggyBank, IndianRupee } from 'lucide-react'
+import {
+  Wallet, Plus, Trash2, TrendingUp, TrendingDown, PiggyBank, IndianRupee,
+  FileText, Copy, Loader2, CheckCircle2
+} from 'lucide-react'
 import { api } from '../api/client'
 import { CashExpense, CashExpenseCategory, CashLedgerSummary } from '../types'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
@@ -33,6 +36,10 @@ export default function CashLedger() {
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
+  const [pdfLoading, setPdfLoading] = useState(false)
+  const [copyLoading, setCopyLoading] = useState(false)
+  const [doneMsg, setDoneMsg] = useState('')
+
   const load = () => {
     setLoading(true)
     api.get<CashLedgerSummary>('/cash-ledger/summary', { params: { date } })
@@ -42,6 +49,12 @@ export default function CashLedger() {
   }
 
   useEffect(() => { load() }, [date])
+
+  useEffect(() => {
+    if (!doneMsg) return
+    const t = setTimeout(() => setDoneMsg(''), 2200)
+    return () => clearTimeout(t)
+  }, [doneMsg])
 
   const openAdd = () => {
     setForm({ amount: 0, category: 'PetrolAllowance', recipientName: '', sentVia: 'Cash', notes: '' })
@@ -74,19 +87,83 @@ export default function CashLedger() {
     load()
   }
 
+  const downloadPdf = async () => {
+    setPdfLoading(true)
+    try {
+      const res = await api.get('/cash-ledger/pdf', { params: { date }, responseType: 'blob' })
+      const blob = new Blob([res.data], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `cash-ledger-${date}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      setDoneMsg('PDF generated!')
+    } finally {
+      setPdfLoading(false)
+    }
+  }
+
+  const buildLedgerText = () => {
+    if (!summary) return ''
+    const balanceAfterSpending = summary.collectedToday - summary.expensesToday
+    const lines = [
+      `KR Finance — Cash Ledger (${formatDate(date)})`,
+      '',
+      `Collected Today: ${formatCurrency(summary.collectedToday)}`,
+      `Spent / Sent Today: ${formatCurrency(summary.expensesToday)}`,
+      `Balance After Spending Today: ${formatCurrency(balanceAfterSpending)}`,
+      `Total Balance (Yesterday's ${formatCurrency(summary.openingBalance)} + Today's): ${formatCurrency(summary.closingBalance)}`,
+      '',
+      `Entries (${summary.expenses.length}):`
+    ]
+    if (summary.expenses.length === 0) {
+      lines.push('  None')
+    } else {
+      summary.expenses.forEach((e, i) => {
+        const parts = [`${i + 1}. ${CATEGORY_LABEL[e.category]} — ${formatCurrency(e.amount)}`]
+        if (e.recipientName) parts.push(`to ${e.recipientName}`)
+        if (e.sentVia) parts.push(`via ${e.sentVia}`)
+        if (e.notes) parts.push(`(${e.notes})`)
+        parts.push(`— by ${e.createdBy}`)
+        lines.push('  ' + parts.join(' '))
+      })
+    }
+    return lines.join('\n')
+  }
+
+  const copyText = async () => {
+    if (!summary) return
+    setCopyLoading(true)
+    try {
+      await navigator.clipboard.writeText(buildLedgerText())
+      setDoneMsg('Copied to clipboard!')
+    } finally {
+      setCopyLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
           <Wallet className="text-blue-600" size={22} /> Cash Ledger
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
             className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
           />
+          <Button size="sm" variant="secondary" disabled={pdfLoading || !summary} onClick={downloadPdf}>
+            {pdfLoading ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+            {pdfLoading ? 'Generating...' : 'Download PDF'}
+          </Button>
+          <Button size="sm" variant="secondary" disabled={copyLoading || !summary} onClick={copyText}>
+            {copyLoading ? <Loader2 size={16} className="animate-spin" /> : <Copy size={16} />}
+            {copyLoading ? 'Copying...' : 'Copy as Text'}
+          </Button>
           <Button size="sm" onClick={openAdd}>
             <Plus size={16} /> Add Entry
           </Button>
@@ -216,6 +293,15 @@ export default function CashLedger() {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteId(null)}
       />
+
+      {doneMsg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 pointer-events-none">
+          <div className="bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-2xl shadow-xl px-6 py-5 flex flex-col items-center gap-2 pointer-events-auto">
+            <CheckCircle2 size={32} className="text-green-400 dark:text-green-600" />
+            <p className="text-sm font-semibold">{doneMsg}</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

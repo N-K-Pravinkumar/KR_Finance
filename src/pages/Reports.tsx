@@ -165,7 +165,6 @@ export default function Reports() {
     { label: 'Monthly Collection PDF', action: () => downloadBlob('/reports/pdf/monthly-collection', { year: monthYear, month }, `monthly-collection-${monthYear}-${month}.pdf`, PDF_MIME) },
     { label: 'Pending Report PDF', action: () => downloadBlob('/reports/pdf/pending', {}, 'pending-report.pdf', PDF_MIME) },
     { label: 'Recovery Report PDF', action: () => downloadBlob('/reports/pdf/recovery', {}, 'recovery-report.pdf', PDF_MIME) },
-    { label: 'Ledger PDF', action: () => downloadBlob('/reports/pdf/ledger', {}, 'ledger.pdf', PDF_MIME) },
     {
       label: 'Customer Statement PDF',
       action: () => statementCustomerId && downloadBlob(`/reports/pdf/customer-statement/${statementCustomerId}`, {}, `customer-statement-${statementCustomerId}.pdf`, PDF_MIME),
