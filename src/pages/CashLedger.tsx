@@ -98,7 +98,7 @@ export default function CashLedger() {
         and what's left over — the leftover balance carries automatically into tomorrow.
       </p>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3">
         <Stat
           label="Collected Today"
           value={summary ? formatCurrency(summary.collectedToday) : '—'}
@@ -228,7 +228,7 @@ function Stat({ label, value, sub, icon: Icon, color, highlight }: {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
-          <p className="text-lg font-bold text-gray-900 dark:text-gray-100 mt-0.5 truncate">{value}</p>
+          <p className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 mt-0.5 break-words leading-snug">{value}</p>
           {sub && <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{sub}</p>}
         </div>
         <div className={`p-2 rounded-lg shrink-0 ${color}`}>

@@ -356,7 +356,7 @@ export default function CustomerDetail() {
         </Card>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3">
         <Stat label="Total Pending" value={formatCurrency(customer.pendingAmount)} accent="amber" />
         <Stat label="Current Balance" value={formatCurrency(customer.currentBalance)} accent="amber" />
         <Stat label={customer.financeType === 'Weekly' ? 'Weeks Left' : 'Days Left'} value={dueLabel(customer.nextDueDate, customer.financeType)} accent="blue" />

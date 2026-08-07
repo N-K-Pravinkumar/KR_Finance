@@ -37,14 +37,14 @@ const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.s
  * page the same premium at-a-glance summary look as the Dashboard's own stat cards. */
 function StatTile({ label, value, icon: Icon, color }: { label: string; value: string | number; icon: React.ElementType; color: string }) {
   return (
-    <Card className="p-4">
-      <div className="flex items-center justify-between">
+    <Card className="p-3 sm:p-4">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{label}</p>
-          <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mt-1 truncate">{value}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+          <p className="text-base sm:text-xl font-bold text-gray-900 dark:text-gray-100 mt-1 break-words leading-snug">{value}</p>
         </div>
-        <div className={`p-2 rounded-lg shrink-0 ${color}`}>
-          <Icon size={20} />
+        <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${color}`}>
+          <Icon size={18} />
         </div>
       </div>
     </Card>
@@ -202,7 +202,7 @@ export default function Reports() {
       {summary && (
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Current Portfolio (excludes closed accounts)</p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3">
             <StatTile label="Total Financed" value={formatCurrency(summary.totalFinanced)} icon={IndianRupee} color="text-gray-600 bg-gray-100 dark:bg-gray-700" />
             <StatTile label="Total Collected" value={formatCurrency(summary.totalCollected)} icon={Wallet} color="text-green-600 bg-green-50 dark:bg-green-900/30" />
             <StatTile label="Total Pending" value={formatCurrency(summary.totalPending)} icon={CalendarClock} color="text-amber-600 bg-amber-50 dark:bg-amber-900/30" />
