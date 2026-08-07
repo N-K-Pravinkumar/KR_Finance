@@ -60,6 +60,15 @@ export default function CustomerDetail() {
     return () => clearTimeout(t)
   }, [successMsg])
 
+  // Once the customer loads, give the browser tab a meaningful title instead of the generic
+  // "Customer Details" placeholder — restored on unmount so navigating elsewhere doesn't stick.
+  useEffect(() => {
+    if (!customer) return
+    const prevTitle = document.title
+    document.title = `${customer.name} — KR Finance`
+    return () => { document.title = prevTitle }
+  }, [customer?.name])
+
   if (!customer) return <p className="text-sm text-gray-400 dark:text-gray-500 py-10 text-center">Loading...</p>
 
   const installment = customer.installmentAmount || 0
@@ -348,14 +357,14 @@ export default function CustomerDetail() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Stat label="Total Pending" value={formatCurrency(customer.pendingAmount)} />
-        <Stat label="Current Balance" value={formatCurrency(customer.currentBalance)} />
-        <Stat label={customer.financeType === 'Weekly' ? 'Weeks Left' : 'Days Left'} value={dueLabel(customer.nextDueDate, customer.financeType)} />
-        <Stat label="Last Payment" value={customer.lastPaymentDate ? `${formatCurrency(customer.lastPaymentAmount)} on ${formatDate(customer.lastPaymentDate)}` : 'No payments yet'} />
-        <Stat label="Next Due Date" value={formatDate(customer.nextDueDate)} />
-        <Stat label="Start Date" value={formatDate(customer.startDate)} />
-        <Stat label="End Date (Est.)" value={customer.endDate ? formatDate(customer.endDate) : '—'} />
-        <Stat label="Installments Paid" value={`${customer.paidInstallments} / ${customer.totalInstallments}`} />
+        <Stat label="Total Pending" value={formatCurrency(customer.pendingAmount)} accent="amber" />
+        <Stat label="Current Balance" value={formatCurrency(customer.currentBalance)} accent="amber" />
+        <Stat label={customer.financeType === 'Weekly' ? 'Weeks Left' : 'Days Left'} value={dueLabel(customer.nextDueDate, customer.financeType)} accent="blue" />
+        <Stat label="Last Payment" value={customer.lastPaymentDate ? `${formatCurrency(customer.lastPaymentAmount)} on ${formatDate(customer.lastPaymentDate)}` : 'No payments yet'} accent="green" />
+        <Stat label="Next Due Date" value={formatDate(customer.nextDueDate)} accent="blue" />
+        <Stat label="Start Date" value={formatDate(customer.startDate)} accent="gray" />
+        <Stat label="End Date (Est.)" value={customer.endDate ? formatDate(customer.endDate) : '—'} accent="gray" />
+        <Stat label="Installments Paid" value={`${customer.paidInstallments} / ${customer.totalInstallments}`} accent="purple" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -729,9 +738,17 @@ export default function CustomerDetail() {
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+const STAT_ACCENTS: Record<string, string> = {
+  amber: 'border-l-4 border-amber-500 bg-amber-50/60 dark:bg-amber-900/10',
+  blue: 'border-l-4 border-blue-500 bg-blue-50/60 dark:bg-blue-900/10',
+  green: 'border-l-4 border-green-500 bg-green-50/60 dark:bg-green-900/10',
+  purple: 'border-l-4 border-purple-500 bg-purple-50/60 dark:bg-purple-900/10',
+  gray: 'border-l-4 border-gray-300 dark:border-gray-600'
+}
+
+function Stat({ label, value, accent = 'gray' }: { label: string; value: string; accent?: keyof typeof STAT_ACCENTS }) {
   return (
-    <Card className="p-4">
+    <Card className={`p-4 ${STAT_ACCENTS[accent]}`}>
       <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
       <p className="text-sm sm:text-lg font-bold text-gray-900 dark:text-gray-100 mt-1">{value}</p>
     </Card>

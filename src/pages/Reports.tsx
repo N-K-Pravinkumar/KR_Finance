@@ -92,6 +92,20 @@ export default function Reports() {
     return dailyReport.rows.filter((r) => !q || r.name.toLowerCase().includes(q) || r.mobile.includes(q))
   }, [dailyReport, dailySearch])
 
+  // Grand totals for the visible rows — mirrors the "TOTAL" row on the downloadable PDF
+  // (every numeric column except Days Paid, since summing installment counts isn't meaningful).
+  const dailyTotals = useMemo(() => {
+    return dailyRows.reduce(
+      (acc, r) => ({
+        daily: acc.daily + (r.dailyCollection || 0),
+        loan: acc.loan + (r.totalLoanAmount || 0),
+        paid: acc.paid + (r.totalPaid || 0),
+        balance: acc.balance + (r.balanceAmount || 0)
+      }),
+      { daily: 0, loan: 0, paid: 0, balance: 0 }
+    )
+  }, [dailyRows])
+
   useEffect(() => {
     if (!receiptCustomerId) { setReceiptPayments([]); return }
     api.get<Payment[]>(`/payments/customer/${receiptCustomerId}`).then((r) => setReceiptPayments(r.data))
@@ -175,19 +189,25 @@ export default function Reports() {
       </div>
 
       {summary && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatTile label="Total Financed" value={formatCurrency(summary.totalFinanced)} icon={IndianRupee} color="text-gray-600 bg-gray-100 dark:bg-gray-700" />
-          <StatTile label="Total Collected" value={formatCurrency(summary.totalCollected)} icon={Wallet} color="text-green-600 bg-green-50 dark:bg-green-900/30" />
-          <StatTile label="Total Pending" value={formatCurrency(summary.totalPending)} icon={CalendarClock} color="text-amber-600 bg-amber-50 dark:bg-amber-900/30" />
-          <StatTile label="Overdue Customers" value={summary.overdueCount} icon={TrendingDown} color="text-red-600 bg-red-50 dark:bg-red-900/30" />
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Today</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <StatTile label="Today's Total Collection (Due)" value={formatCurrency(summary.todayToCollect)} icon={TrendingUp} color="text-blue-600 bg-blue-50 dark:bg-blue-900/30" />
+            <StatTile label="Today's Collected Amount" value={formatCurrency(summary.todayCollected)} icon={CheckCircle2} color="text-green-600 bg-green-50 dark:bg-green-900/30" />
+            <StatTile label="Today's Pending Amount" value={formatCurrency(summary.todayNotCollected)} icon={XCircle} color="text-red-600 bg-red-50 dark:bg-red-900/30" />
+          </div>
         </div>
       )}
 
       {summary && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <StatTile label="Today's Total Collection (Due)" value={formatCurrency(summary.todayToCollect)} icon={TrendingUp} color="text-blue-600 bg-blue-50 dark:bg-blue-900/30" />
-          <StatTile label="Today's Collected Amount" value={formatCurrency(summary.todayCollected)} icon={CheckCircle2} color="text-green-600 bg-green-50 dark:bg-green-900/30" />
-          <StatTile label="Today's Pending Amount" value={formatCurrency(summary.todayNotCollected)} icon={XCircle} color="text-red-600 bg-red-50 dark:bg-red-900/30" />
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Current Portfolio (excludes closed accounts)</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatTile label="Total Financed" value={formatCurrency(summary.totalFinanced)} icon={IndianRupee} color="text-gray-600 bg-gray-100 dark:bg-gray-700" />
+            <StatTile label="Total Collected" value={formatCurrency(summary.totalCollected)} icon={Wallet} color="text-green-600 bg-green-50 dark:bg-green-900/30" />
+            <StatTile label="Total Pending" value={formatCurrency(summary.totalPending)} icon={CalendarClock} color="text-amber-600 bg-amber-50 dark:bg-amber-900/30" />
+            <StatTile label="Overdue Customers" value={summary.overdueCount} icon={TrendingDown} color="text-red-600 bg-red-50 dark:bg-red-900/30" />
+          </div>
         </div>
       )}
 
@@ -245,17 +265,18 @@ export default function Reports() {
               />
             </div>
 
-            {/* Desktop/tablet table */}
+            {/* Desktop/tablet table — Name, Daily Amt, Days Paid, Loan Amt, Total Paid, Balance, Today (in that order, per the same layout as the downloadable PDF) */}
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 text-xs uppercase">
                   <tr>
                     <th className="text-left px-3 py-2">Name</th>
-                    <th className="text-right px-3 py-2">Daily Amount</th>
-                    <th className="text-right px-3 py-2">Collected Today</th>
-                    <th className="text-right px-3 py-2">Balance</th>
+                    <th className="text-right px-3 py-2">Daily Amt</th>
                     <th className="text-left px-3 py-2">Days Paid</th>
-                    <th className="text-left px-3 py-2">Status</th>
+                    <th className="text-right px-3 py-2">Loan Amt</th>
+                    <th className="text-right px-3 py-2">Total Paid</th>
+                    <th className="text-right px-3 py-2">Balance</th>
+                    <th className="text-left px-3 py-2">Today</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -266,15 +287,29 @@ export default function Reports() {
                         <p className="text-xs text-gray-400 dark:text-gray-500">{r.mobile}</p>
                       </td>
                       <td className="px-3 py-2 text-right text-gray-900 dark:text-gray-100">{formatCurrency(r.dailyCollection)}</td>
-                      <td className="px-3 py-2 text-right text-gray-900 dark:text-gray-100">
-                        {r.todayAmount != null ? formatCurrency(r.todayAmount) : '—'}
-                      </td>
-                      <td className="px-3 py-2 text-right text-gray-900 dark:text-gray-100">{formatCurrency(r.balanceAmount)}</td>
                       <td className="px-3 py-2 text-gray-900 dark:text-gray-100">{r.daysPaid} / {r.totalInstallments}</td>
+                      <td className="px-3 py-2 text-right text-gray-900 dark:text-gray-100">{formatCurrency(r.totalLoanAmount)}</td>
+                      <td className="px-3 py-2 text-right text-gray-900 dark:text-gray-100">{formatCurrency(r.totalPaid)}</td>
+                      <td className="px-3 py-2 text-right text-gray-900 dark:text-gray-100">{formatCurrency(r.balanceAmount)}</td>
                       <td className="px-3 py-2"><Badge color={statusBadgeColor(r.todayStatus)}>{r.todayStatus}</Badge></td>
                     </tr>
                   ))}
                 </tbody>
+                {dailyRows.length > 0 && (
+                  <tfoot>
+                    <tr className="border-t-2 border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 font-semibold text-gray-900 dark:text-gray-100">
+                      <td className="px-3 py-2">TOTAL</td>
+                      <td className="px-3 py-2 text-right">{formatCurrency(dailyTotals.daily)}</td>
+                      <td className="px-3 py-2">—</td>
+                      <td className="px-3 py-2 text-right">{formatCurrency(dailyTotals.loan)}</td>
+                      <td className="px-3 py-2 text-right">{formatCurrency(dailyTotals.paid)}</td>
+                      <td className="px-3 py-2 text-right">{formatCurrency(dailyTotals.balance)}</td>
+                      <td className="px-3 py-2 text-xs font-normal">
+                        {dailyReport && <>Paid {dailyReport.paidCount} / Not Paid {dailyReport.notPaidCount}</>}
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
 
@@ -290,16 +325,30 @@ export default function Reports() {
                     <Badge color={statusBadgeColor(r.todayStatus)}>{r.todayStatus}</Badge>
                   </div>
                   <div className="grid grid-cols-2 gap-1 text-xs text-gray-500 dark:text-gray-400">
-                    <p>Daily: <span className="text-gray-800 dark:text-gray-200 font-medium">{formatCurrency(r.dailyCollection)}</span></p>
-                    <p>Today: <span className="text-gray-800 dark:text-gray-200 font-medium">{r.todayAmount != null ? formatCurrency(r.todayAmount) : '—'}</span></p>
-                    <p>Balance: <span className="text-gray-800 dark:text-gray-200 font-medium">{formatCurrency(r.balanceAmount)}</span></p>
+                    <p>Daily Amt: <span className="text-gray-800 dark:text-gray-200 font-medium">{formatCurrency(r.dailyCollection)}</span></p>
                     <p>Days Paid: <span className="text-gray-800 dark:text-gray-200 font-medium">{r.daysPaid} / {r.totalInstallments}</span></p>
+                    <p>Loan Amt: <span className="text-gray-800 dark:text-gray-200 font-medium">{formatCurrency(r.totalLoanAmount)}</span></p>
+                    <p>Total Paid: <span className="text-gray-800 dark:text-gray-200 font-medium">{formatCurrency(r.totalPaid)}</span></p>
+                    <p>Balance: <span className="text-gray-800 dark:text-gray-200 font-medium">{formatCurrency(r.balanceAmount)}</span></p>
                   </div>
                 </div>
               ))}
             </div>
 
             {dailyRows.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">No customers found.</p>}
+
+            {dailyRows.length > 0 && (
+              <div className="sm:hidden border border-gray-200 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700/50 text-xs">
+                <p className="font-semibold text-gray-900 dark:text-gray-100 mb-1">TOTAL</p>
+                <div className="grid grid-cols-2 gap-1 text-gray-600 dark:text-gray-300">
+                  <p>Daily Amt: <span className="font-semibold text-gray-900 dark:text-gray-100">{formatCurrency(dailyTotals.daily)}</span></p>
+                  <p>Loan Amt: <span className="font-semibold text-gray-900 dark:text-gray-100">{formatCurrency(dailyTotals.loan)}</span></p>
+                  <p>Total Paid: <span className="font-semibold text-gray-900 dark:text-gray-100">{formatCurrency(dailyTotals.paid)}</span></p>
+                  <p>Balance: <span className="font-semibold text-gray-900 dark:text-gray-100">{formatCurrency(dailyTotals.balance)}</span></p>
+                </div>
+                {dailyReport && <p className="mt-1 text-gray-500 dark:text-gray-400">Paid {dailyReport.paidCount} / Not Paid {dailyReport.notPaidCount}</p>}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

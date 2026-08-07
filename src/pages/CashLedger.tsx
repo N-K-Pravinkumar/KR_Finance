@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Wallet, Plus, Trash2 } from 'lucide-react'
+import { Wallet, Plus, Trash2, TrendingUp, TrendingDown, PiggyBank, IndianRupee } from 'lucide-react'
 import { api } from '../api/client'
 import { CashExpense, CashExpenseCategory, CashLedgerSummary } from '../types'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
@@ -99,10 +99,35 @@ export default function CashLedger() {
       </p>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Stat label="Opening Balance" value={summary ? formatCurrency(summary.openingBalance) : '—'} sub="Carried from previous days" />
-        <Stat label="Collected Today" value={summary ? formatCurrency(summary.collectedToday) : '—'} sub="From loan collections" />
-        <Stat label="Spent / Sent Today" value={summary ? formatCurrency(summary.expensesToday) : '—'} sub="Allowances, salary, transfers" />
-        <Stat label="Closing Balance" value={summary ? formatCurrency(summary.closingBalance) : '—'} sub="Rolls into tomorrow" highlight />
+        <Stat
+          label="Collected Today"
+          value={summary ? formatCurrency(summary.collectedToday) : '—'}
+          sub="From today's loan collections"
+          icon={TrendingUp}
+          color="text-green-600 bg-green-50 dark:bg-green-900/30"
+        />
+        <Stat
+          label="Spent / Sent Today"
+          value={summary ? formatCurrency(summary.expensesToday) : '—'}
+          sub="Allowances, salary, transfers"
+          icon={TrendingDown}
+          color="text-red-600 bg-red-50 dark:bg-red-900/30"
+        />
+        <Stat
+          label="Today's Balance After Spending"
+          value={summary ? formatCurrency(summary.collectedToday - summary.expensesToday) : '—'}
+          sub="Collected today minus spent today"
+          icon={PiggyBank}
+          color="text-amber-600 bg-amber-50 dark:bg-amber-900/30"
+        />
+        <Stat
+          label="Total Balance (Carried Forward)"
+          value={summary ? formatCurrency(summary.closingBalance) : '—'}
+          sub={summary ? `Yesterday's balance ${formatCurrency(summary.openingBalance)} + today's` : 'Rolls into tomorrow'}
+          icon={IndianRupee}
+          color="text-blue-600 bg-blue-50 dark:bg-blue-900/30"
+          highlight
+        />
       </div>
 
       <Card>
@@ -195,12 +220,21 @@ export default function CashLedger() {
   )
 }
 
-function Stat({ label, value, sub, highlight }: { label: string; value: string; sub?: string; highlight?: boolean }) {
+function Stat({ label, value, sub, icon: Icon, color, highlight }: {
+  label: string; value: string; sub?: string; icon: React.ElementType; color: string; highlight?: boolean
+}) {
   return (
     <Card className={`p-3 ${highlight ? 'ring-2 ring-blue-500' : ''}`}>
-      <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="text-lg font-bold text-gray-900 dark:text-gray-100 mt-0.5">{value}</p>
-      {sub && <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{sub}</p>}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+          <p className="text-lg font-bold text-gray-900 dark:text-gray-100 mt-0.5 truncate">{value}</p>
+          {sub && <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{sub}</p>}
+        </div>
+        <div className={`p-2 rounded-lg shrink-0 ${color}`}>
+          <Icon size={18} />
+        </div>
+      </div>
     </Card>
   )
 }
