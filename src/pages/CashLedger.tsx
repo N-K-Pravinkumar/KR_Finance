@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import {
   Wallet, Plus, Trash2, TrendingUp, TrendingDown, PiggyBank, IndianRupee,
-  FileText, Copy, Loader2, CheckCircle2
+  FileText, Copy, Loader2, CheckCircle2, Pencil
 } from 'lucide-react'
 import { api } from '../api/client'
 import { CashExpense, CashExpenseCategory, CashLedgerSummary } from '../types'
@@ -17,7 +17,8 @@ const CATEGORY_LABEL: Record<CashExpenseCategory, string> = {
   FoodAllowance: 'Food Allowance',
   Salary: 'Salary',
   SentToPerson: 'Sent to Person',
-  Other: 'Other'
+  Other: 'Other',
+  Adjustment: 'Balance Adjustment'
 }
 
 const SENT_VIA_OPTIONS = ['Cash', 'GPay', 'PhonePe', 'Paytm', 'Bank Transfer', 'Other']
@@ -39,6 +40,10 @@ export default function CashLedger() {
   const [pdfLoading, setPdfLoading] = useState(false)
   const [copyLoading, setCopyLoading] = useState(false)
   const [doneMsg, setDoneMsg] = useState('')
+
+  const [showEditBalance, setShowEditBalance] = useState(false)
+  const [targetBalance, setTargetBalance] = useState(0)
+  const [balanceSaving, setBalanceSaving] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -143,6 +148,26 @@ export default function CashLedger() {
     }
   }
 
+  const openEditBalance = () => {
+    if (!summary) return
+    setTargetBalance(summary.closingBalance)
+    setShowEditBalance(true)
+  }
+
+  const submitEditBalance = async () => {
+    setBalanceSaving(true)
+    try {
+      await api.put('/cash-ledger/balance', null, {
+        params: { date, targetBalance, editedBy: user?.name }
+      })
+      setShowEditBalance(false)
+      setDoneMsg('Balance updated!')
+      load()
+    } finally {
+      setBalanceSaving(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -204,6 +229,7 @@ export default function CashLedger() {
           icon={IndianRupee}
           color="text-blue-600 bg-blue-50 dark:bg-blue-900/30"
           highlight
+          onEdit={summary ? openEditBalance : undefined}
         />
       </div>
 
@@ -284,6 +310,39 @@ export default function CashLedger() {
         </div>
       </Dialog>
 
+      <Dialog
+        open={showEditBalance}
+        onClose={() => setShowEditBalance(false)}
+        title="Correct Total Balance"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowEditBalance(false)}>Cancel</Button>
+            <Button disabled={balanceSaving} onClick={submitEditBalance}>{balanceSaving ? 'Saving...' : 'Update Balance'}</Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Sets the Total Balance (Carried Forward) for {formatDate(date)} to whatever you enter — useful when it
+            doesn't match what's actually in hand. This logs a "Balance Adjustment" entry for the difference, so
+            there's a clear record of who corrected it and by how much.
+          </p>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Correct Total Balance (Rs.)</label>
+            <input type="number" value={targetBalance} onChange={(e) => setTargetBalance(Number(e.target.value))}
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          {summary && (
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Currently: {formatCurrency(summary.closingBalance)}
+              {targetBalance !== summary.closingBalance && (
+                <> — will log an adjustment of {formatCurrency(targetBalance - summary.closingBalance)}</>
+              )}
+            </p>
+          )}
+        </div>
+      </Dialog>
+
       <ConfirmDialog
         open={deleteId != null}
         title="Delete this entry?"
@@ -306,14 +365,21 @@ export default function CashLedger() {
   )
 }
 
-function Stat({ label, value, sub, icon: Icon, color, highlight }: {
-  label: string; value: string; sub?: string; icon: React.ElementType; color: string; highlight?: boolean
+function Stat({ label, value, sub, icon: Icon, color, highlight, onEdit }: {
+  label: string; value: string; sub?: string; icon: React.ElementType; color: string; highlight?: boolean; onEdit?: () => void
 }) {
   return (
     <Card className={`p-3 ${highlight ? 'ring-2 ring-blue-500' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+            {onEdit && (
+              <button onClick={onEdit} className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 p-0.5 shrink-0" title="Correct this balance">
+                <Pencil size={11} />
+              </button>
+            )}
+          </div>
           <p className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 mt-0.5 break-words leading-snug">{value}</p>
           {sub && <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{sub}</p>}
         </div>

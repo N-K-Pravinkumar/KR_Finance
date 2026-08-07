@@ -116,7 +116,7 @@ export interface DailyReport {
   rows: DailyReportRow[]
 }
 
-export type CashExpenseCategory = 'PetrolAllowance' | 'FoodAllowance' | 'Salary' | 'SentToPerson' | 'Other'
+export type CashExpenseCategory = 'PetrolAllowance' | 'FoodAllowance' | 'Salary' | 'SentToPerson' | 'Other' | 'Adjustment'
 
 export interface CashExpense {
   id: number
