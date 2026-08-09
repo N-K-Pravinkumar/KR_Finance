@@ -86,6 +86,12 @@ export default function Reports() {
     api.get<DailyReport>('/reports/daily', { params: { date: dailyReportDate } }).then((r) => setDailyReport(r.data))
   }, [activeTab, dailyReportDate])
 
+  const statementCustomerOptions = useMemo(() => {
+    if (!pickerQuery) return customers
+    const q = pickerQuery.toLowerCase()
+    return customers.filter((c) => c.name.toLowerCase().includes(q) || c.mobile.includes(q))
+  }, [customers, pickerQuery])
+
   const dailyRows = useMemo(() => {
     if (!dailyReport) return []
     const q = dailySearch.toLowerCase()
@@ -115,12 +121,6 @@ export default function Reports() {
     () => customers.filter((c) => c.name.toLowerCase().includes(search.toLowerCase())),
     [customers, search]
   )
-
-  const pickerResults = useMemo(() => {
-    if (!pickerQuery) return []
-    const q = pickerQuery.toLowerCase()
-    return customers.filter((c) => c.name.toLowerCase().includes(q) || c.mobile.includes(q)).slice(0, 8)
-  }, [customers, pickerQuery])
 
   const exportCsv = () => {
     const headers = ['Name', 'Mobile', 'Financed', 'Collected', 'Pending', 'Status', 'Next Due']
@@ -380,10 +380,22 @@ export default function Reports() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="relative">
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Customer for Statement</label>
+              <div className="relative mb-1.5">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                <input
+                  type="text"
+                  placeholder="Search by name or phone..."
+                  value={pickerQuery}
+                  onChange={(e) => setPickerQuery(e.target.value)}
+                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg pl-8 pr-3 py-2 text-sm"
+                />
+              </div>
               <select className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
                 value={statementCustomerId} onChange={(e) => setStatementCustomerId(e.target.value ? Number(e.target.value) : '')}>
-                <option value="">Select customer...</option>
-                {customers.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.mobile})</option>)}
+                <option value="">
+                  {statementCustomerOptions.length === 0 ? 'No matches...' : `Select customer... (${statementCustomerOptions.length})`}
+                </option>
+                {statementCustomerOptions.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.mobile})</option>)}
               </select>
             </div>
             <div>

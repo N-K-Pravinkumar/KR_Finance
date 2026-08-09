@@ -5,9 +5,11 @@ import {
 } from 'recharts'
 import {
   Users, Wallet, TrendingUp, TrendingDown, CalendarDays, CalendarRange, CalendarClock,
-  UserCheck, PercentCircle
+  UserCheck, PercentCircle, CheckCircle2, XCircle
 } from 'lucide-react'
 import { fetchDashboard, DashboardData } from '../api/dashboard'
+import { api } from '../api/client'
+import { OrgSummary } from '../types'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { formatCurrency } from '../utils/format'
 
@@ -22,6 +24,7 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [summary, setSummary] = useState<OrgSummary | null>(null)
 
   useEffect(() => {
     setLoading(true)
@@ -29,6 +32,7 @@ export default function Dashboard() {
       .then(setData)
       .catch(() => setError('Failed to load dashboard data.'))
       .finally(() => setLoading(false))
+    api.get<OrgSummary>('/reports/summary').then((r) => setSummary(r.data)).catch(() => {})
   }, [])
 
   const paymentStatusData = useMemo(() => {
@@ -64,6 +68,47 @@ export default function Dashboard() {
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400">Overview of collections and portfolio health</p>
       </div>
+
+      {summary && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Today</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Card className="p-3 sm:p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Today's Total Collection (Due)</p>
+                  <p className="text-base sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1 break-words leading-snug">{formatCurrency(summary.todayToCollect)}</p>
+                </div>
+                <div className="p-1.5 sm:p-2 rounded-lg shrink-0 text-blue-600 bg-blue-50 dark:bg-blue-900/30">
+                  <TrendingUp size={18} />
+                </div>
+              </div>
+            </Card>
+            <Card className="p-3 sm:p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Today's Collected Amount</p>
+                  <p className="text-base sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1 break-words leading-snug">{formatCurrency(summary.todayCollected)}</p>
+                </div>
+                <div className="p-1.5 sm:p-2 rounded-lg shrink-0 text-green-600 bg-green-50 dark:bg-green-900/30">
+                  <CheckCircle2 size={18} />
+                </div>
+              </div>
+            </Card>
+            <Card className="p-3 sm:p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Today's Pending Amount</p>
+                  <p className="text-base sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1 break-words leading-snug">{formatCurrency(summary.todayNotCollected)}</p>
+                </div>
+                <div className="p-1.5 sm:p-2 rounded-lg shrink-0 text-red-600 bg-red-50 dark:bg-red-900/30">
+                  <XCircle size={18} />
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
         {kpis.map((kpi) => (
