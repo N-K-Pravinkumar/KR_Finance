@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Zap, Users, FileText, ScrollText, Menu, X, LogOut, Wallet, Sun, Moon, IndianRupee
+  LayoutDashboard, Zap, Users, FileText, ScrollText, Menu, X, LogOut, Wallet, Sun, Moon, IndianRupee, Carrot
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
@@ -12,7 +12,8 @@ const navItems = [
   { to: '/customers', label: 'Customers', icon: Users, adminOnly: false },
   { to: '/reports', label: 'Reports', icon: FileText, adminOnly: false },
   { to: '/cash-ledger', label: 'Cash Ledger', icon: IndianRupee, adminOnly: true },
-  { to: '/audit-log', label: 'Audit Log', icon: ScrollText, adminOnly: true }
+  { to: '/audit-log', label: 'Audit Log', icon: ScrollText, adminOnly: true },
+  { to: '/naveen', label: 'Naveen', icon: Carrot, adminOnly: true }
 ]
 
 export function Layout({ children }: { children: React.ReactNode }) {

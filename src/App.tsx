@@ -12,6 +12,11 @@ import CustomerDetail from './pages/CustomerDetail'
 import Reports from './pages/Reports'
 import AuditLog from './pages/AuditLog'
 import CashLedger from './pages/CashLedger'
+import NaveenDashboard from './naveen/pages/NaveenDashboard'
+import NaveenSuppliers from './naveen/pages/Suppliers'
+import NaveenBorrowed from './naveen/pages/Borrowed'
+import NaveenLoans from './naveen/pages/Loans'
+import NaveenCashLedger from './naveen/pages/NaveenCashLedger'
 
 // Gives every route a meaningful browser tab title instead of the generic "KR Finance"
 // everywhere. CustomerDetail overrides this itself once it knows the customer's name.
@@ -25,7 +30,12 @@ const PAGE_TITLES: { test: (path: string) => boolean; title: string }[] = [
   { test: (p) => p === '/customers', title: 'Customers' },
   { test: (p) => p === '/reports', title: 'Reports' },
   { test: (p) => p === '/cash-ledger', title: 'Cash Ledger' },
-  { test: (p) => p === '/audit-log', title: 'Audit Log' }
+  { test: (p) => p === '/audit-log', title: 'Audit Log' },
+  { test: (p) => p === '/naveen', title: "Naveen's Business" },
+  { test: (p) => p === '/naveen/suppliers', title: 'Naveen — Suppliers' },
+  { test: (p) => p === '/naveen/borrowed', title: 'Naveen — Money Borrowed' },
+  { test: (p) => p === '/naveen/loans', title: 'Naveen — Money Given' },
+  { test: (p) => p === '/naveen/cash-ledger', title: 'Naveen — Cash Ledger' }
 ]
 
 function usePageTitle() {
@@ -63,6 +73,11 @@ function AppRoutes() {
       <Route path="/reports" element={<PrivateRoute><Reports /></PrivateRoute>} />
       <Route path="/cash-ledger" element={<AdminRoute><CashLedger /></AdminRoute>} />
       <Route path="/audit-log" element={<AdminRoute><AuditLog /></AdminRoute>} />
+      <Route path="/naveen" element={<AdminRoute><NaveenDashboard /></AdminRoute>} />
+      <Route path="/naveen/suppliers" element={<AdminRoute><NaveenSuppliers /></AdminRoute>} />
+      <Route path="/naveen/borrowed" element={<AdminRoute><NaveenBorrowed /></AdminRoute>} />
+      <Route path="/naveen/loans" element={<AdminRoute><NaveenLoans /></AdminRoute>} />
+      <Route path="/naveen/cash-ledger" element={<AdminRoute><NaveenCashLedger /></AdminRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
