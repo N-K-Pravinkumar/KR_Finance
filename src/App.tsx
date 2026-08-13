@@ -49,13 +49,15 @@ function usePageTitle() {
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
-  if (!user) return <Navigate to="/login" replace />
+  const location = useLocation()
+  if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />
   return <Layout>{children}</Layout>
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
-  if (!user) return <Navigate to="/login" replace />
+  const location = useLocation()
+  if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />
   if (user.role !== 'Admin') return <Navigate to="/" replace />
   return <Layout>{children}</Layout>
 }
@@ -64,7 +66,8 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 // same login, but its own standalone shell (NaveenLayout) instead of the shared Layout.
 function NaveenRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
-  if (!user) return <Navigate to="/login" replace />
+  const location = useLocation()
+  if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />
   if (user.role !== 'Admin') return <Navigate to="/" replace />
   return <NaveenLayout>{children}</NaveenLayout>
 }

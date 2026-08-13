@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Wallet, LogIn } from 'lucide-react'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
@@ -12,6 +12,10 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  // If you were bounced here from a specific page (e.g. typed /naveen directly while logged
+  // out), send you back there after signing in instead of always landing on the dashboard.
+  const from = (location.state as { from?: string } | null)?.from || '/'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -20,7 +24,7 @@ export default function Login() {
     try {
       const res = await api.post('/auth/login', { username, password })
       login(res.data)
-      navigate('/')
+      navigate(from, { replace: true })
     } catch (err) {
       setError('Invalid username or password')
     } finally {
