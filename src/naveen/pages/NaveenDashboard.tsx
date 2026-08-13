@@ -4,7 +4,6 @@ import { Card } from '../../components/ui/Card'
 import { formatCurrency } from '../../utils/format'
 import { getNaveenDashboard } from '../api/naveenApi'
 import { NaveenDashboard as NaveenDashboardData } from '../types'
-import { NaveenTabs } from '../NaveenTabs'
 
 export default function NaveenDashboard() {
   const [data, setData] = useState<NaveenDashboardData | null>(null)
@@ -28,7 +27,6 @@ export default function NaveenDashboard() {
 
   return (
     <div className="space-y-6 py-2">
-      <NaveenTabs />
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Naveen's Business</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400">Vegetable purchases, borrowed money, and money given out — all in one place</p>

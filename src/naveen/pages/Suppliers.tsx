@@ -7,7 +7,6 @@ import { formatCurrency, formatDate } from '../../utils/format'
 import { useAuth } from '../../context/AuthContext'
 import { addSupplier, addSupplierPayment, addSupplierPurchase, listSuppliers } from '../api/naveenApi'
 import { SupplierSummary } from '../types'
-import { NaveenTabs } from '../NaveenTabs'
 
 const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100'
 
@@ -78,7 +77,6 @@ export default function Suppliers() {
 
   return (
     <div className="space-y-4 py-2">
-      <NaveenTabs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Suppliers</h1>

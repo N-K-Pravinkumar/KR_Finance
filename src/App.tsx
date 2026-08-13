@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { Layout } from './components/layout/Layout'
+import { NaveenLayout } from './naveen/NaveenLayout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import QuickCollection from './pages/QuickCollection'
@@ -59,6 +60,15 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <Layout>{children}</Layout>
 }
 
+// Naveen's business section is deliberately kept out of the KR Finance sidebar/dashboard —
+// same login, but its own standalone shell (NaveenLayout) instead of the shared Layout.
+function NaveenRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
+  if (!user) return <Navigate to="/login" replace />
+  if (user.role !== 'Admin') return <Navigate to="/" replace />
+  return <NaveenLayout>{children}</NaveenLayout>
+}
+
 function AppRoutes() {
   usePageTitle()
   return (
@@ -73,11 +83,11 @@ function AppRoutes() {
       <Route path="/reports" element={<PrivateRoute><Reports /></PrivateRoute>} />
       <Route path="/cash-ledger" element={<AdminRoute><CashLedger /></AdminRoute>} />
       <Route path="/audit-log" element={<AdminRoute><AuditLog /></AdminRoute>} />
-      <Route path="/naveen" element={<AdminRoute><NaveenDashboard /></AdminRoute>} />
-      <Route path="/naveen/suppliers" element={<AdminRoute><NaveenSuppliers /></AdminRoute>} />
-      <Route path="/naveen/borrowed" element={<AdminRoute><NaveenBorrowed /></AdminRoute>} />
-      <Route path="/naveen/loans" element={<AdminRoute><NaveenLoans /></AdminRoute>} />
-      <Route path="/naveen/cash-ledger" element={<AdminRoute><NaveenCashLedger /></AdminRoute>} />
+      <Route path="/naveen" element={<NaveenRoute><NaveenDashboard /></NaveenRoute>} />
+      <Route path="/naveen/suppliers" element={<NaveenRoute><NaveenSuppliers /></NaveenRoute>} />
+      <Route path="/naveen/borrowed" element={<NaveenRoute><NaveenBorrowed /></NaveenRoute>} />
+      <Route path="/naveen/loans" element={<NaveenRoute><NaveenLoans /></NaveenRoute>} />
+      <Route path="/naveen/cash-ledger" element={<NaveenRoute><NaveenCashLedger /></NaveenRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
