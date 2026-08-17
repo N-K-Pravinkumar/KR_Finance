@@ -368,11 +368,11 @@ export default function Reports() {
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Month</label>
-                <input type="number" min={1} max={12} className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm" value={month} onChange={(e) => setMonth(Number(e.target.value))} />
+                <input type="number" min={1} max={12} className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm" value={month || ''} onChange={(e) => setMonth(Number(e.target.value))} />
               </div>
               <div className="flex-1">
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Year</label>
-                <input type="number" className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm" value={monthYear} onChange={(e) => setMonthYear(Number(e.target.value))} />
+                <input type="number" className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm" value={monthYear || ''} onChange={(e) => setMonthYear(Number(e.target.value))} />
               </div>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import {
-  Wallet, Plus, Trash2, TrendingUp, TrendingDown, PiggyBank, IndianRupee,
+  Wallet, Plus, Trash2, Pencil, TrendingUp, TrendingDown, PiggyBank, IndianRupee,
   FileText, Copy, Loader2, CheckCircle2
 } from 'lucide-react'
 import { api } from '../api/client'
@@ -31,8 +31,9 @@ export default function CashLedger() {
   const [loading, setLoading] = useState(false)
 
   const [showAdd, setShowAdd] = useState(false)
+  const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState({
-    amount: 0, category: 'PetrolAllowance' as CashExpenseCategory, recipientName: '', sentVia: 'Cash', notes: ''
+    amount: '', category: 'PetrolAllowance' as CashExpenseCategory, recipientName: '', sentVia: 'Cash', notes: ''
   })
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
@@ -58,23 +59,43 @@ export default function CashLedger() {
   }, [doneMsg])
 
   const openAdd = () => {
-    setForm({ amount: 0, category: 'PetrolAllowance', recipientName: '', sentVia: 'Cash', notes: '' })
+    setEditId(null)
+    setForm({ amount: '', category: 'PetrolAllowance', recipientName: '', sentVia: 'Cash', notes: '' })
+    setShowAdd(true)
+  }
+
+  const openEdit = (e: CashExpense) => {
+    setEditId(e.id)
+    setForm({
+      amount: String(e.amount ?? ''),
+      category: e.category,
+      recipientName: e.recipientName || '',
+      sentVia: e.sentVia || 'Cash',
+      notes: e.notes || ''
+    })
     setShowAdd(true)
   }
 
   const submitAdd = async () => {
-    if (!form.amount || form.amount <= 0) return
+    const amount = parseFloat(form.amount)
+    if (!amount || amount <= 0) return
     setSaving(true)
     try {
-      await api.post('/cash-ledger/expenses', {
+      const payload = {
         date,
-        amount: form.amount,
+        amount,
         category: form.category,
         recipientName: form.recipientName || null,
         sentVia: form.sentVia,
         notes: form.notes
-      }, { params: { createdBy: user?.name } })
+      }
+      if (editId != null) {
+        await api.put(`/cash-ledger/expenses/${editId}`, payload)
+      } else {
+        await api.post('/cash-ledger/expenses', payload, { params: { createdBy: user?.name } })
+      }
       setShowAdd(false)
+      setEditId(null)
       load()
     } finally {
       setSaving(false)
@@ -231,9 +252,14 @@ export default function CashLedger() {
                 {e.notes && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{e.notes}</p>}
                 <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">By {e.createdBy}</p>
               </div>
-              <button onClick={() => setDeleteId(e.id)} className="text-gray-400 hover:text-red-600 dark:hover:text-red-400 p-1">
-                <Trash2 size={15} />
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                <button onClick={() => openEdit(e)} className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 p-1">
+                  <Pencil size={15} />
+                </button>
+                <button onClick={() => setDeleteId(e.id)} className="text-gray-400 hover:text-red-600 dark:hover:text-red-400 p-1">
+                  <Trash2 size={15} />
+                </button>
+              </div>
             </div>
           ))}
         </CardContent>
@@ -241,19 +267,19 @@ export default function CashLedger() {
 
       <Dialog
         open={showAdd}
-        onClose={() => setShowAdd(false)}
-        title="Add Cash Entry"
+        onClose={() => { setShowAdd(false); setEditId(null) }}
+        title={editId != null ? 'Edit Cash Entry' : 'Add Cash Entry'}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setShowAdd(false)}>Cancel</Button>
-            <Button disabled={saving} onClick={submitAdd}>{saving ? 'Saving...' : 'Save Entry'}</Button>
+            <Button variant="secondary" onClick={() => { setShowAdd(false); setEditId(null) }}>Cancel</Button>
+            <Button disabled={saving} onClick={submitAdd}>{saving ? 'Saving...' : editId != null ? 'Save Changes' : 'Save Entry'}</Button>
           </>
         }
       >
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Amount (Rs.)</label>
-            <input type="number" value={form.amount || ''} onChange={(e) => setForm((f) => ({ ...f, amount: Number(e.target.value) }))}
+            <input type="number" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm" />
           </div>
           <div>

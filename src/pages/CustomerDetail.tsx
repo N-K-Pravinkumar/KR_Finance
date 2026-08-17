@@ -21,11 +21,13 @@ export default function CustomerDetail() {
   const [history, setHistory] = useState<AuditEntry[]>([])
   const [otherLoans, setOtherLoans] = useState<Customer[]>([])
   const [editPayment, setEditPayment] = useState<Payment | null>(null)
-  const [editForm, setEditForm] = useState({ amount: 0, date: '', notes: '', reason: '', type: 'Paid' as PaymentType })
+  // amount is kept as a string while the dialog is open so the field can be genuinely empty
+  // while typing/clearing instead of snapping to "0" — parsed to a number only on submit.
+  const [editForm, setEditForm] = useState({ amount: '', date: '', notes: '', reason: '', type: 'Paid' as PaymentType })
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [closeConfirm, setCloseConfirm] = useState(false)
   const [addSlot, setAddSlot] = useState<TimelineEntry | null>(null)
-  const [addForm, setAddForm] = useState({ amount: 0, type: 'Paid' as PaymentType, notes: '' })
+  const [addForm, setAddForm] = useState({ amount: '', type: 'Paid' as PaymentType, notes: '' })
   const [addSubmitting, setAddSubmitting] = useState(false)
 
   // Bulk selection on the full schedule: pick several days, then mark them all Paid / Not Paid,
@@ -77,11 +79,12 @@ export default function CustomerDetail() {
   // number stored in the DB (the real total charged that day) always includes today's amount.
   const toTotal = (extra: number) => installment + (extra || 0)
   const toExtra = (total: number) => Math.max(0, (total || 0) - installment)
+  const numAmount = (s: string) => parseFloat(s) || 0
 
   const openEdit = (p: Payment) => {
     setEditPayment(p)
     setEditForm({
-      amount: p.type === 'Advance' ? toExtra(p.amount) : p.amount,
+      amount: String(p.type === 'Advance' ? toExtra(p.amount) : p.amount),
       date: p.date.slice(0, 10),
       notes: p.notes || '',
       reason: '',
@@ -91,16 +94,16 @@ export default function CustomerDetail() {
 
   const handleEditTypeChange = (type: PaymentType) => {
     setEditForm((f) => {
-      if (type === 'NotPaid') return { ...f, type, amount: 0 }
-      if (type === 'Paid' && !f.amount) return { ...f, type, amount: installment }
-      if (type === 'Advance' && f.type !== 'Advance') return { ...f, type, amount: 0 }
+      if (type === 'NotPaid') return { ...f, type, amount: '0' }
+      if (type === 'Paid' && !numAmount(f.amount)) return { ...f, type, amount: String(installment) }
+      if (type === 'Advance' && f.type !== 'Advance') return { ...f, type, amount: '0' }
       return { ...f, type }
     })
   }
 
   const submitEdit = async () => {
     if (!editPayment) return
-    const amount = editForm.type === 'NotPaid' ? 0 : editForm.type === 'Advance' ? toTotal(editForm.amount) : editForm.amount
+    const amount = editForm.type === 'NotPaid' ? 0 : editForm.type === 'Advance' ? toTotal(numAmount(editForm.amount)) : numAmount(editForm.amount)
     await api.put(`/payments/${editPayment.id}`, {
       amount,
       date: editForm.date,
@@ -191,14 +194,14 @@ export default function CustomerDetail() {
       return
     }
     setAddSlot(t)
-    setAddForm({ amount: installment, type: 'Paid', notes: '' })
+    setAddForm({ amount: String(installment), type: 'Paid', notes: '' })
   }
 
   const handleAddTypeChange = (type: PaymentType) => {
     setAddForm((f) => {
-      if (type === 'NotPaid') return { ...f, type, amount: 0 }
-      if (type === 'Paid' && !f.amount) return { ...f, type, amount: installment }
-      if (type === 'Advance' && f.type !== 'Advance') return { ...f, type, amount: 0 }
+      if (type === 'NotPaid') return { ...f, type, amount: '0' }
+      if (type === 'Paid' && !numAmount(f.amount)) return { ...f, type, amount: String(installment) }
+      if (type === 'Advance' && f.type !== 'Advance') return { ...f, type, amount: '0' }
       return { ...f, type }
     })
   }
@@ -207,7 +210,7 @@ export default function CustomerDetail() {
     if (!addSlot) return
     setAddSubmitting(true)
     try {
-      const amount = addForm.type === 'NotPaid' ? 0 : addForm.type === 'Advance' ? toTotal(addForm.amount) : addForm.amount
+      const amount = addForm.type === 'NotPaid' ? 0 : addForm.type === 'Advance' ? toTotal(numAmount(addForm.amount)) : numAmount(addForm.amount)
       await api.post('/payments', {
         customerId: customer.id,
         date: addSlot.date,
@@ -380,13 +383,13 @@ export default function CustomerDetail() {
 
           {financeEditMode ? (
             <div className="space-y-3">
-              <FinanceField label="Finance Amount (Rs.)" type="number" value={financeForm.financeAmount}
+              <FinanceField label="Finance Amount (Rs.)" type="number" value={financeForm.financeAmount || ''}
                 onChange={(v) => setFinanceForm((f) => ({ ...f, financeAmount: Number(v) }))} />
-              <FinanceField label="Interest (%)" type="number" value={financeForm.interest}
+              <FinanceField label="Interest (%)" type="number" value={financeForm.interest || ''}
                 onChange={(v) => setFinanceForm((f) => ({ ...f, interest: Number(v) }))} />
-              <FinanceField label="Daily/Weekly Installment (Rs.)" type="number" value={financeForm.installmentAmount}
+              <FinanceField label="Daily/Weekly Installment (Rs.)" type="number" value={financeForm.installmentAmount || ''}
                 onChange={(v) => setFinanceForm((f) => ({ ...f, installmentAmount: Number(v) }))} />
-              <FinanceField label="Total Installments" type="number" value={financeForm.totalInstallments}
+              <FinanceField label="Total Installments" type="number" value={financeForm.totalInstallments || ''}
                 onChange={(v) => setFinanceForm((f) => ({ ...f, totalInstallments: Number(v) }))} />
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Type</label>
@@ -410,9 +413,9 @@ export default function CustomerDetail() {
               )}
               <FinanceField label="Start Date" type="date" value={financeForm.startDate}
                 onChange={(v) => setFinanceForm((f) => ({ ...f, startDate: v }))} />
-              <FinanceField label="Total Paid (Rs.)" type="number" value={financeForm.totalPaid}
+              <FinanceField label="Total Paid (Rs.)" type="number" value={financeForm.totalPaid || ''}
                 onChange={(v) => setFinanceForm((f) => ({ ...f, totalPaid: Number(v) }))} />
-              <FinanceField label="Installments Paid" type="number" value={financeForm.paidInstallments}
+              <FinanceField label="Installments Paid" type="number" value={financeForm.paidInstallments || ''}
                 onChange={(v) => setFinanceForm((f) => ({ ...f, paidInstallments: Number(v) }))} />
               <p className="text-xs text-amber-600 dark:text-amber-400 -mt-2">
                 Total Amount, Current Balance and Total Pending are calculated automatically from these values.
@@ -628,7 +631,7 @@ export default function CustomerDetail() {
           footer={
             <>
               <Button variant="secondary" onClick={() => setEditPayment(null)}>Cancel</Button>
-              <Button onClick={submitEdit} disabled={!editForm.reason}>Save Changes</Button>
+              <Button onClick={submitEdit} disabled={!editForm.reason || (editForm.type !== 'NotPaid' && editForm.type !== 'Advance' && !(numAmount(editForm.amount) > 0))}>Save Changes</Button>
             </>
           }
         >
@@ -651,10 +654,10 @@ export default function CustomerDetail() {
                   {editForm.type === 'Advance' ? `Extra advance (on top of today's ${formatCurrency(installment)})` : 'Amount'}
                 </label>
                 <input type="number" className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
-                  value={editForm.amount} onChange={(e) => setEditForm((f) => ({ ...f, amount: Number(e.target.value) }))} />
+                  value={editForm.amount} onChange={(e) => setEditForm((f) => ({ ...f, amount: e.target.value }))} />
                 {editForm.type === 'Advance' && (
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                    Total to be recorded: {formatCurrency(toTotal(editForm.amount))} ({formatCurrency(installment)} today + {formatCurrency(editForm.amount)} extra)
+                    Total to be recorded: {formatCurrency(toTotal(numAmount(editForm.amount)))} ({formatCurrency(installment)} today + {formatCurrency(numAmount(editForm.amount))} extra)
                   </p>
                 )}
               </div>
@@ -688,7 +691,7 @@ export default function CustomerDetail() {
             <Button variant="secondary" onClick={() => setAddSlot(null)}>Cancel</Button>
             <Button
               onClick={submitAddSlot}
-              disabled={addSubmitting || (addForm.type !== 'NotPaid' && addForm.type !== 'Advance' && !(addForm.amount > 0))}
+              disabled={addSubmitting || (addForm.type !== 'NotPaid' && addForm.type !== 'Advance' && !(numAmount(addForm.amount) > 0))}
             >
               {addSubmitting ? 'Saving...' : 'Save'}
             </Button>
@@ -719,10 +722,10 @@ export default function CustomerDetail() {
               </label>
               <input type="number" min={0} autoFocus
                 className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
-                value={addForm.amount} onChange={(e) => setAddForm((f) => ({ ...f, amount: Number(e.target.value) }))} />
+                value={addForm.amount} onChange={(e) => setAddForm((f) => ({ ...f, amount: e.target.value }))} />
               {addForm.type === 'Advance' && (
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  Total to be recorded: {formatCurrency(toTotal(addForm.amount))} ({formatCurrency(installment)} today + {formatCurrency(addForm.amount)} extra)
+                  Total to be recorded: {formatCurrency(toTotal(numAmount(addForm.amount)))} ({formatCurrency(installment)} today + {formatCurrency(numAmount(addForm.amount))} extra)
                 </p>
               )}
             </div>

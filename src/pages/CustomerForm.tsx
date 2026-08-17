@@ -6,10 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { useAuth } from '../context/AuthContext'
 
+// financeAmount / interest / totalInstallments are kept as strings while editing so the field
+// can show truly empty while typing instead of snapping to "0" — they're parsed to numbers on submit.
 const emptyForm = {
   name: '', mobile: '', alternateMobile: '', groupKey: '', address: '',
-  financeAmount: 0, interest: 10, startDate: new Date().toISOString().slice(0, 10),
-  financeType: 'Daily' as 'Daily' | 'Weekly', collectionDay: '', totalInstallments: 100
+  financeAmount: '', interest: '10', startDate: new Date().toISOString().slice(0, 10),
+  financeType: 'Daily' as 'Daily' | 'Weekly', collectionDay: '', totalInstallments: '100'
 }
 
 export default function CustomerForm() {
@@ -26,9 +28,9 @@ export default function CustomerForm() {
         const c = r.data
         setForm({
           name: c.name, mobile: c.mobile, alternateMobile: c.alternateMobile || '', groupKey: c.groupKey || '',
-          address: c.address, financeAmount: c.financeAmount, interest: c.interest,
+          address: c.address, financeAmount: String(c.financeAmount ?? ''), interest: String(c.interest ?? ''),
           startDate: c.startDate?.slice(0, 10), financeType: c.financeType,
-          collectionDay: c.collectionDay || '', totalInstallments: c.totalInstallments
+          collectionDay: c.collectionDay || '', totalInstallments: String(c.totalInstallments ?? '')
         })
       })
     }
@@ -42,8 +44,11 @@ export default function CustomerForm() {
     e.preventDefault()
     setSaving(true)
     try {
-      const installmentAmount = Math.round(((form.financeAmount * (1 + form.interest / 100)) / form.totalInstallments) * 100) / 100
-      const payload = { ...form, installmentAmount }
+      const financeAmount = parseFloat(form.financeAmount) || 0
+      const interest = parseFloat(form.interest) || 0
+      const totalInstallments = parseInt(form.totalInstallments, 10) || 100
+      const installmentAmount = Math.round(((financeAmount * (1 + interest / 100)) / totalInstallments) * 100) / 100
+      const payload = { ...form, financeAmount, interest, totalInstallments, installmentAmount }
       if (isEdit) {
         await api.put(`/customers/${id}`, payload, { params: { editedBy: user?.name, reason: 'Profile update' } })
       } else {
@@ -80,8 +85,8 @@ export default function CustomerForm() {
             </div>
             <Field label="Address" value={form.address} onChange={(v) => handleChange('address', v)} textarea />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Finance Amount (Rs.)" type="number" value={form.financeAmount} onChange={(v) => handleChange('financeAmount', Number(v))} required />
-              <Field label="Interest (%)" type="number" value={form.interest} onChange={(v) => handleChange('interest', Number(v))} required />
+              <Field label="Finance Amount (Rs.)" type="number" value={form.financeAmount} onChange={(v) => handleChange('financeAmount', v)} required />
+              <Field label="Interest (%)" type="number" value={form.interest} onChange={(v) => handleChange('interest', v)} required />
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Finance Type</label>
                 <select
@@ -108,7 +113,7 @@ export default function CustomerForm() {
                   </select>
                 </div>
               )}
-              <Field label="Total Installments" type="number" value={form.totalInstallments} onChange={(v) => handleChange('totalInstallments', Number(v))} required />
+              <Field label="Total Installments" type="number" value={form.totalInstallments} onChange={(v) => handleChange('totalInstallments', v)} required />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
