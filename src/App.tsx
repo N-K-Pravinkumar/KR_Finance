@@ -17,7 +17,8 @@ import NaveenDashboard from './naveen/pages/NaveenDashboard'
 import NaveenSuppliers from './naveen/pages/Suppliers'
 import NaveenBorrowed from './naveen/pages/Borrowed'
 import NaveenLoans from './naveen/pages/Loans'
-import NaveenCashLedger from './naveen/pages/NaveenCashLedger'
+import NaveenBilling from './naveen/pages/Billing'
+import NaveenExpenses from './naveen/pages/Expenses'
 
 // Gives every route a meaningful browser tab title instead of the generic "KR Finance"
 // everywhere. CustomerDetail overrides this itself once it knows the customer's name.
@@ -36,7 +37,8 @@ const PAGE_TITLES: { test: (path: string) => boolean; title: string }[] = [
   { test: (p) => p === '/naveen/suppliers', title: 'Naveen — Suppliers' },
   { test: (p) => p === '/naveen/borrowed', title: 'Naveen — Money Borrowed' },
   { test: (p) => p === '/naveen/loans', title: 'Naveen — Money Given' },
-  { test: (p) => p === '/naveen/cash-ledger', title: 'Naveen — Cash Ledger' }
+  { test: (p) => p === '/naveen/billing', title: 'Naveen — Billing' },
+  { test: (p) => p === '/naveen/expenses', title: 'Naveen — Expenses' }
 ]
 
 function usePageTitle() {
@@ -90,7 +92,8 @@ function AppRoutes() {
       <Route path="/naveen/suppliers" element={<NaveenRoute><NaveenSuppliers /></NaveenRoute>} />
       <Route path="/naveen/borrowed" element={<NaveenRoute><NaveenBorrowed /></NaveenRoute>} />
       <Route path="/naveen/loans" element={<NaveenRoute><NaveenLoans /></NaveenRoute>} />
-      <Route path="/naveen/cash-ledger" element={<NaveenRoute><NaveenCashLedger /></NaveenRoute>} />
+      <Route path="/naveen/billing" element={<NaveenRoute><NaveenBilling /></NaveenRoute>} />
+      <Route path="/naveen/expenses" element={<NaveenRoute><NaveenExpenses /></NaveenRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

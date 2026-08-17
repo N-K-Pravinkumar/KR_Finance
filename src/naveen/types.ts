@@ -15,9 +15,9 @@ export interface NaveenSupplierPurchase {
   id: number
   supplierId: number
   date: string
-  item: string
-  qty: number
-  rate: number
+  item?: string
+  qty?: number
+  rate?: number
   amount: number
   notes?: string
   createdBy: string
@@ -140,4 +140,33 @@ export interface NaveenDashboard {
   activeLoans: number
   activeBorrowings: number
   activeSuppliers: number
+  totalAmount: number
+  totalPaid: number
+  totalPending: number
+}
+
+export interface NaveenBillItem {
+  id: number
+  billId: number
+  item: string
+  qty: number
+  rate: number
+  amount: number
+}
+
+export interface NaveenBill {
+  id: number
+  supplierId?: number
+  purchaseId?: number
+  customerName?: string
+  date: string
+  totalAmount: number
+  createdBy: string
+  createdAt: string
+}
+
+export interface BillDetail {
+  bill: NaveenBill
+  items: NaveenBillItem[]
+  supplierName?: string
 }

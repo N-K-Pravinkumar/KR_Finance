@@ -6,7 +6,8 @@ const tabs = [
   { to: '/naveen/suppliers', label: 'Suppliers' },
   { to: '/naveen/borrowed', label: 'Borrowed' },
   { to: '/naveen/loans', label: 'Money Given' },
-  { to: '/naveen/cash-ledger', label: 'Cash Ledger' }
+  { to: '/naveen/billing', label: 'Billing' },
+  { to: '/naveen/expenses', label: 'Expenses' }
 ]
 
 /** A small sub-navigation bar for Naveen's business section, kept separate from the main KR Finance sidebar. */

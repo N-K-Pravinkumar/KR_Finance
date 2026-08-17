@@ -4,6 +4,8 @@ import { Card } from '../../components/ui/Card'
 import { formatCurrency } from '../../utils/format'
 import { getNaveenDashboard } from '../api/naveenApi'
 import { NaveenDashboard as NaveenDashboardData } from '../types'
+import { NaveenTotals } from '../NaveenTotals'
+import { NaveenLoading } from '../NaveenLoading'
 
 export default function NaveenDashboard() {
   const [data, setData] = useState<NaveenDashboardData | null>(null)
@@ -14,7 +16,7 @@ export default function NaveenDashboard() {
     getNaveenDashboard().then(setData).catch(() => setError('Failed to load dashboard.')).finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <p className="text-sm text-gray-400 dark:text-gray-500 py-10 text-center">Loading...</p>
+  if (loading) return <NaveenLoading label="Loading Naveen's business..." />
   if (error) return <p className="text-sm text-red-500 py-10 text-center">{error}</p>
   if (!data) return null
 
@@ -31,6 +33,8 @@ export default function NaveenDashboard() {
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Naveen's Business</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400">Vegetable purchases, borrowed money, and money given out — all in one place</p>
       </div>
+
+      <NaveenTotals totalAmount={data.totalAmount} totalPaid={data.totalPaid} totalPending={data.totalPending} />
 
       <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {cards.map((c) => (
