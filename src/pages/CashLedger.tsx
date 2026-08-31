@@ -117,11 +117,19 @@ export default function CashLedger() {
     setSavingBalance(true)
     try {
       await api.put('/cash-ledger/balance', null, {
-        params: { date, targetBalance: value, editedBy: user?.name }
+        params: { date, targetBalance: value, editedBy: user?.name || 'Admin' }
       })
       setShowSetBalance(false)
       setDoneMsg('Balance updated!')
       load()
+    } catch (err: any) {
+      const status = err?.response?.status
+      const serverMsg = err?.response?.data?.message || err?.response?.data?.error || err?.message
+      alert(
+        status === 403
+          ? 'Could not save: this account is not recognized as Admin by the server. Please log out and log back in, then try again.'
+          : `Could not save the balance. ${serverMsg ? `Error: ${serverMsg}` : 'Please check your connection and try again.'}`
+      )
     } finally {
       setSavingBalance(false)
     }
