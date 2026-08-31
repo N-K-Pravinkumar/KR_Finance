@@ -42,6 +42,10 @@ export default function CashLedger() {
   const [copyLoading, setCopyLoading] = useState(false)
   const [doneMsg, setDoneMsg] = useState('')
 
+  const [showSetBalance, setShowSetBalance] = useState(false)
+  const [targetBalance, setTargetBalance] = useState('')
+  const [savingBalance, setSavingBalance] = useState(false)
+
   const load = () => {
     setLoading(true)
     api.get<CashLedgerSummary>('/cash-ledger/summary', { params: { date } })
@@ -99,6 +103,27 @@ export default function CashLedger() {
       load()
     } finally {
       setSaving(false)
+    }
+  }
+
+  const openSetBalance = () => {
+    setTargetBalance(summary ? String(summary.closingBalance) : '')
+    setShowSetBalance(true)
+  }
+
+  const submitSetBalance = async () => {
+    const value = Number(targetBalance)
+    if (!Number.isFinite(value)) return
+    setSavingBalance(true)
+    try {
+      await api.put('/cash-ledger/balance', null, {
+        params: { date, targetBalance: value, editedBy: user?.name }
+      })
+      setShowSetBalance(false)
+      setDoneMsg('Balance updated!')
+      load()
+    } finally {
+      setSavingBalance(false)
     }
   }
 
@@ -226,6 +251,7 @@ export default function CashLedger() {
           icon={IndianRupee}
           color="text-blue-600 bg-blue-50 dark:bg-blue-900/30"
           highlight
+          onEdit={summary ? openSetBalance : undefined}
         />
       </div>
 
@@ -311,6 +337,35 @@ export default function CashLedger() {
         </div>
       </Dialog>
 
+      <Dialog
+        open={showSetBalance}
+        onClose={() => setShowSetBalance(false)}
+        title={`Set Total Balance (Carried Forward) — ${formatDate(date)}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowSetBalance(false)}>Cancel</Button>
+            <Button disabled={savingBalance} onClick={submitSetBalance}>{savingBalance ? 'Saving...' : 'Save'}</Button>
+          </>
+        }
+      >
+        <div>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            Total Balance (Carried Forward) for this day (Rs.)
+          </label>
+          <input
+            type="number"
+            value={targetBalance}
+            onChange={(e) => setTargetBalance(e.target.value)}
+            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg px-3 py-2 text-sm"
+            autoFocus
+          />
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            Enter a negative number (e.g. -1600) if the balance should be negative. This logs an adjustment
+            entry and anchors every later day's carried-forward balance from this corrected value.
+          </p>
+        </div>
+      </Dialog>
+
       <ConfirmDialog
         open={deleteId != null}
         title="Delete this entry?"
@@ -333,14 +388,21 @@ export default function CashLedger() {
   )
 }
 
-function Stat({ label, value, sub, icon: Icon, color, highlight }: {
-  label: string; value: string; sub?: string; icon: React.ElementType; color: string; highlight?: boolean
+function Stat({ label, value, sub, icon: Icon, color, highlight, onEdit }: {
+  label: string; value: string; sub?: string; icon: React.ElementType; color: string; highlight?: boolean; onEdit?: () => void
 }) {
   return (
     <Card className={`p-3 ${highlight ? 'ring-2 ring-blue-500' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+            {onEdit && (
+              <button onClick={onEdit} className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 p-0.5" title="Manually set this balance">
+                <Pencil size={12} />
+              </button>
+            )}
+          </div>
           <p className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 mt-0.5 break-words leading-snug">{value}</p>
           {sub && <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{sub}</p>}
         </div>
