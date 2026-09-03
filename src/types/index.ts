@@ -130,6 +130,23 @@ export interface CashExpense {
   createdAt: string
 }
 
+export interface QuickCollectionRow {
+  customerId: number
+  name: string
+  mobile: string
+  groupKey?: string
+  financeAmount: number
+  installmentAmount: number
+  financeType: FinanceType
+  nextDueDate?: string
+  status: CustomerStatus
+  paymentId?: number
+  paymentType?: PaymentType
+  paymentAmount?: number
+  notes?: string
+  collectedBy?: string
+}
+
 export interface CashLedgerSummary {
   date: string
   openingBalance: number
