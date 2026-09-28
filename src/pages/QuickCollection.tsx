@@ -1,15 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Search, CheckCircle2, XCircle, Clock3, TrendingUp, Pencil } from 'lucide-react'
+import { Search, Pencil, CheckCircle2, XCircle, Clock3, TrendingUp } from 'lucide-react'
 import { api } from '../api/client'
 import { QuickCollectionRow, PaymentType } from '../types'
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
-import { ConfirmDialog, Dialog } from '../components/ui/Dialog'
+import { Dialog } from '../components/ui/Dialog'
 import { Button } from '../components/ui/Button'
 import { formatCurrency, dueLabel, isOverdue, todayLocalISO, formatDate } from '../utils/format'
 import { useAuth } from '../context/AuthContext'
 
-type SimpleAction = { row: QuickCollectionRow; type: 'Paid' | 'NotPaid' } | null
 type AmountAction = { row: QuickCollectionRow; type: 'Partial' | 'Advance' } | null
 type EditAction = { row: QuickCollectionRow } | null
 
@@ -34,13 +33,14 @@ const TILE_ICON: Record<PaymentType, React.ElementType> = {
   Advance: TrendingUp
 }
 
-function ActionTile({ type, onClick }: { type: PaymentType; onClick: () => void }) {
+function ActionTile({ type, onClick, disabled }: { type: PaymentType; onClick: () => void; disabled?: boolean }) {
   const style = TILE_STYLES[type]
   const Icon = TILE_ICON[type]
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center justify-center gap-1 sm:gap-1.5 rounded-xl sm:rounded-2xl py-2 sm:py-3.5 ${style.bg} ${style.text} shadow-sm transition-transform active:scale-95`}
+      disabled={disabled}
+      className={`flex flex-col items-center justify-center gap-1 sm:gap-1.5 rounded-xl sm:rounded-2xl py-2 sm:py-3.5 ${style.bg} ${style.text} shadow-sm transition-transform active:scale-95 disabled:opacity-50 disabled:pointer-events-none`}
     >
       <span className="rounded-full border-2 border-white/70 p-1 sm:p-1.5">
         <Icon size={14} className="sm:hidden" />
@@ -55,7 +55,6 @@ export default function QuickCollection() {
   const [rows, setRows] = useState<QuickCollectionRow[]>([])
   const [search, setSearch] = useState('')
   const [date, setDate] = useState(todayLocalISO())
-  const [pending, setPending] = useState<SimpleAction>(null)
   const [amountAction, setAmountAction] = useState<AmountAction>(null)
   const [amountValue, setAmountValue] = useState('')
   const [editAction, setEditAction] = useState<EditAction>(null)
@@ -114,21 +113,19 @@ export default function QuickCollection() {
     })
   }
 
-  const handleConfirm = async () => {
-    if (!pending) return
+  const handleSimple = async (row: QuickCollectionRow, type: 'Paid' | 'NotPaid') => {
     setSubmitting(true)
     try {
       await submitPayment(
-        pending.row.customerId,
-        pending.type,
-        pending.type === 'Paid' ? pending.row.installmentAmount : 0,
-        pending.type === 'Paid' ? 'Quick collection' : 'Marked not paid'
+        row.customerId,
+        type,
+        type === 'Paid' ? row.installmentAmount : 0,
+        type === 'Paid' ? 'Quick collection' : 'Marked not paid'
       )
-      setSuccessMsg(`${pending.row.name} marked as ${pending.type === 'Paid' ? 'Paid' : 'Not Paid'}.`)
+      setSuccessMsg(`${row.name} marked as ${type === 'Paid' ? 'Paid' : 'Not Paid'}.`)
       load()
     } finally {
       setSubmitting(false)
-      setPending(null)
     }
   }
 
@@ -269,10 +266,10 @@ export default function QuickCollection() {
                         </div>
                       ) : (
                         <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                          <ActionTile type="Paid" onClick={() => setPending({ row: c, type: 'Paid' })} />
-                          <ActionTile type="Partial" onClick={() => { setAmountAction({ row: c, type: 'Partial' }); setAmountValue('') }} />
-                          <ActionTile type="NotPaid" onClick={() => setPending({ row: c, type: 'NotPaid' })} />
-                          <ActionTile type="Advance" onClick={() => { setAmountAction({ row: c, type: 'Advance' }); setAmountValue('') }} />
+                          <ActionTile type="Paid" disabled={submitting} onClick={() => handleSimple(c, 'Paid')} />
+                          <ActionTile type="Partial" disabled={submitting} onClick={() => { setAmountAction({ row: c, type: 'Partial' }); setAmountValue('') }} />
+                          <ActionTile type="NotPaid" disabled={submitting} onClick={() => handleSimple(c, 'NotPaid')} />
+                          <ActionTile type="Advance" disabled={submitting} onClick={() => { setAmountAction({ row: c, type: 'Advance' }); setAmountValue('') }} />
                         </div>
                       )}
                     </div>
@@ -290,18 +287,6 @@ export default function QuickCollection() {
           </p>
         )}
       </div>
-
-      <ConfirmDialog
-        open={!!pending}
-        title={`Mark as ${pending?.type === 'Paid' ? 'Paid' : 'Not Paid'}?`}
-        message={`Are you sure you want to mark ${pending?.row.name}'s payment as ${
-          pending?.type === 'Paid' ? 'Paid' : 'Not Paid'
-        }?`}
-        confirmLabel={submitting ? 'Saving...' : 'Confirm'}
-        onConfirm={handleConfirm}
-        onCancel={() => setPending(null)}
-        danger={pending?.type === 'NotPaid'}
-      />
 
       <Dialog
         open={!!amountAction}
